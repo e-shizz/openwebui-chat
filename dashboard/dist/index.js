@@ -427,11 +427,15 @@
         "div",
         {
           className: cn(
-            "flex flex-col h-full transition-all duration-300 ease-out overflow-hidden border-r border-border/30 shadow-lg min-w-0",
+            "flex flex-col h-full ease-out overflow-hidden min-w-0",
             sidebarOpen
-              ? "w-72 flex-shrink-0 bg-background/70 backdrop-blur-xl"
-              : "w-0 opacity-0"
+              ? "bg-background/70 backdrop-blur-xl border-r border-border/30 shadow-lg"
+              : "opacity-0"
           ),
+          style: {
+            width: sidebarOpen ? "18rem" : "0px",
+            transition: "width 300ms ease-out, opacity 300ms ease-out",
+          },
         },
         /* Sidebar header */
         React.createElement(
@@ -529,41 +533,34 @@
             )
           ),
 
-        /* Empty state */
-        !hasContent &&
-          React.createElement(
-            "div",
-            { className: "flex-1 flex flex-col items-center justify-center px-4 overflow-y-auto" },
-            React.createElement(
+        /* Content area: empty state or messages */
+        !hasContent
+          ? React.createElement(
               "div",
-              { className: "flex flex-col items-center mb-6 select-none", style: { fontFamily: "monospace", lineHeight: 1.15 } },
-              CADUCEUS_ART.map((line, i) =>
-                React.createElement(
-                  "div",
-                  {
-                    key: i,
-                    className: cn(
-                      "text-xs md:text-sm whitespace-pre",
-                      i < 4 ? "text-amber-400" :
-                      i < 8 ? "text-yellow-500" :
-                      i < 12 ? "text-amber-600" : "text-yellow-700"
-                    ),
-                  },
-                  line
+              { className: "flex-1 flex flex-col items-center justify-center px-4 overflow-y-auto" },
+              React.createElement(
+                "div",
+                { className: "flex flex-col items-center mb-6 select-none", style: { fontFamily: "monospace", lineHeight: 1.15 } },
+                CADUCEUS_ART.map((line, i) =>
+                  React.createElement(
+                    "div",
+                    {
+                      key: i,
+                      className: cn(
+                        "text-xs md:text-sm whitespace-pre",
+                        i < 4 ? "text-amber-400" :
+                        i < 8 ? "text-yellow-500" :
+                        i < 12 ? "text-amber-600" : "text-yellow-700"
+                      ),
+                    },
+                    line
+                  )
                 )
-              )
-            ),
-            React.createElement("h1", { className: "text-2xl md:text-3xl font-bold text-foreground tracking-tight mb-1" }, "Nous Hermes"),
-            React.createElement("p", { className: "text-sm text-muted-foreground" }, "Messenger of the Digital Gods")
-          ),
-
-        /* Active chat */
-        hasContent &&
-          React.createElement(
-            React.Fragment,
-            null,
-            /* Messages scroll area */
-            React.createElement(
+              ),
+              React.createElement("h1", { className: "text-2xl md:text-3xl font-bold text-foreground tracking-tight mb-1" }, "Nous Hermes"),
+              React.createElement("p", { className: "text-sm text-muted-foreground" }, "Messenger of the Digital Gods")
+            )
+          : React.createElement(
               "div",
               { className: "flex-1 overflow-y-auto min-h-0 px-4 py-4 md:px-6" },
               error &&
@@ -589,43 +586,43 @@
                 }),
               React.createElement("div", { ref: messagesEndRef })
             ),
-            /* Input bar */
+
+        /* Input bar - always visible */
+        React.createElement(
+          "div",
+          { className: "flex-shrink-0 border-t border-border p-3 md:p-4" },
+          React.createElement(
+            "div",
+            { className: "flex gap-2 items-end max-w-3xl mx-auto" },
+            React.createElement(Input, {
+              ref: inputRef,
+              value: inputValue,
+              onChange: (e) => setInputValue(e.target.value),
+              onKeyDown: handleKeyDown,
+              placeholder: "Message Hermes...",
+              disabled: isLoading,
+              className: "flex-1 min-h-[44px]",
+              style: fontSize ? { fontSize: `${fontSize}px` } : {},
+            }),
+            React.createElement(
+              Button,
+              {
+                onClick: handleSend,
+                disabled: isLoading || !inputValue.trim(),
+                size: "default",
+              },
+              isLoading ? "\u2026" : "Send"
+            )
+          ),
+          activeSessionId &&
             React.createElement(
               "div",
-              { className: "flex-shrink-0 border-t border-border p-3 md:p-4" },
-              React.createElement(
-                "div",
-                { className: "flex gap-2 items-end max-w-3xl mx-auto" },
-                React.createElement(Input, {
-                  ref: inputRef,
-                  value: inputValue,
-                  onChange: (e) => setInputValue(e.target.value),
-                  onKeyDown: handleKeyDown,
-                  placeholder: "Message Hermes...",
-                  disabled: isLoading,
-                  className: "flex-1 min-h-[44px]",
-                  style: fontSize ? { fontSize: `${fontSize}px` } : {},
-                }),
-                React.createElement(
-                  Button,
-                  {
-                    onClick: handleSend,
-                    disabled: isLoading || !inputValue.trim(),
-                    size: "default",
-                  },
-                  isLoading ? "\u2026" : "Send"
-                )
-              ),
-              activeSessionId &&
-                React.createElement(
-                  "div",
-                  { className: "text-[10px] text-muted-foreground text-center mt-1.5" },
-                  "Session: ",
-                  activeSessionId.slice(0, 20),
-                  "\u2026"
-                )
+              { className: "text-[10px] text-muted-foreground text-center mt-1.5" },
+              "Session: ",
+              activeSessionId.slice(0, 20),
+              "\u2026"
             )
-          )
+        )
       )
     );
   }
