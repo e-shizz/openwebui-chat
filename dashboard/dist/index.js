@@ -6,7 +6,7 @@
   const { Card, CardContent, Button, Input, Badge, Separator } = components;
   const { cn, timeAgo } = utils;
 
-  /* ── CodeBlock with hover copy button ─────────────────────────────────────────────── */
+  /* ── CodeBlock with hover copy button ─────────────────────────── */
   function CodeBlock({ code, lang, fontSize }) {
     const [copied, setCopied] = useState(false);
     const handleCopy = useCallback(() => {
@@ -24,7 +24,6 @@
         className:
           "group relative bg-muted/80 bg-black/20 rounded-lg p-3 my-2 font-mono text-xs text-foreground overflow-x-auto border border-border/30",
       },
-      /* Copy button — appears on hover */
       React.createElement(
         "button",
         {
@@ -56,7 +55,6 @@
               "Copy"
             )
       ),
-      /* Language label */
       lang &&
         React.createElement(
           "div",
@@ -71,12 +69,11 @@
     );
   }
 
-  /* ── ChatBubble ─────────────────────────────────────────────── */
+  /* ── ChatBubble ──────────────────────────────────────────────── */
   function ChatBubble({ role, content, isStreaming, fontSize }) {
     const isUser = role === "user";
     const textStyle = fontSize ? { fontSize: `${fontSize}px`, lineHeight: 1.6 } : {};
 
-    /* ── User: readable muted bubble ── */
     if (isUser) {
       return React.createElement(
         "div",
@@ -101,7 +98,6 @@
       );
     }
 
-    /* ── Assistant: plain text + code blocks in darker containers ── */
     function parseSegments(text) {
       if (!text) return [{ type: "text", content: "" }];
       const segments = [];
@@ -149,7 +145,7 @@
     );
   }
 
-  /* ── SessionItem ────────────────────────────────────────────── */
+  /* ── SessionItem ─────────────────────────────────────────────── */
   function SessionItem({ session, isActive, onClick }) {
     return React.createElement(
       "div",
@@ -189,53 +185,33 @@
     );
   }
 
-  /* ── MobileToggle ───────────────────────────────────────────── */
-  function MobileToggle({ sidebarOpen, onToggle }) {
-    return React.createElement(
-      "button",
-      {
-        onClick: onToggle,
-        className:
-          "md:hidden fixed bottom-4 left-4 z-50 h-10 w-10 rounded-full bg-primary text-primary-foreground shadow-lg flex items-center justify-center",
-        title: sidebarOpen ? "Hide sessions" : "Show sessions",
-      },
-      sidebarOpen ? "✕" : "☰"
-    );
-  }
-
-  /* ── Hermes ASCII caduceus (from TUI banner.ts) ────────────── */
+  /* ── Hermes ASCII caduceus ───────────────────────────────────── */
   const CADUCEUS_ART = [
-    "⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢀⣀⡀⠀⣀⣀⠀⢀⣀⡀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀",
-    "⠀⠀⠀⠀⠀⠀⢀⣠⣴⣾⣿⣿⣇⠸⣿⣿⠇⣸⣿⣿⣷⣦⣄⡀⠀⠀⠀⠀⠀⠀",
-    "⠀⢀⣠⣴⣶⠿⠋⣩⡿⣿⡿⠻⣿⡇⢠⡄⢸⣿⠟⢿⣿⢿⣍⠙⠿⣶⣦⣄⡀⠀",
-    "⠀⠀⠉⠉⠁⠶⠟⠋⠀⠉⠀⢀⣈⣁⡈⢁⣈⣁⡀⠀⠉⠀⠙⠻⠶⠈⠉⠉⠀⠀",
-    "⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⣴⣿⡿⠛⢁⡈⠛⢿⣿⣦⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀",
-    "⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠿⣿⣦⣤⣈⠁⢠⣴⣿⠿⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀",
-    "⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠈⠉⠻⢿⣿⣦⡉⠁⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀",
-    "⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠘⢷⣦⣈⠛⠃⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀",
-    "⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢠⣴⠦⠈⠙⠿⣦⡄⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀",
-    "⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠸⣿⣤⡈⠁⢤⣿⠇⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀",
-    "⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠉⠛⠷⠄⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀",
-    "⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢀⣀⠑⢶⣄⡀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀",
-    "⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⣿⠁⢰⡆⠈⡿⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀",
-    "⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠈⠳⠈⣡⠞⠁⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀",
-    "⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠈⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀"
+    "\u2800\u2800\u2800\u2800\u2800\u2800\u2800\u2800\u2800\u2800\u2880\u28c0\u2840\u2800\u28c0\u28c0\u2800\u2880\u28c0\u2840\u2800\u2800\u2800\u2800\u2800\u2800\u2800\u2800\u2800\u2800",
+    "\u2800\u2800\u2800\u2800\u2800\u2800\u2880\u28e0\u28f4\u28fe\u28ff\u28ff\u28c7\u2838\u28ff\u28ff\u2807\u28f8\u28ff\u28ff\u28f7\u28e6\u28c4\u2840\u2800\u2800\u2800\u2800\u2800\u2800",
+    "\u2800\u2880\u28e0\u28f4\u28f6\u283f\u280b\u28e9\u287f\u28ff\u287f\u283b\u28ff\u2847\u28a0\u2844\u28b8\u28ff\u281f\u28bf\u28ff\u28bf\u28cd\u2819\u283f\u28f6\u28e6\u28c4\u2840\u2800",
+    "\u2800\u2800\u2809\u2809\u2801\u2836\u281f\u280b\u2800\u2809\u2800\u2880\u28c8\u28c1\u2848\u2881\u28c8\u28c1\u2840\u2800\u2809\u2800\u2819\u283b\u2836\u2808\u2809\u2809\u2800\u2800",
+    "\u2800\u2800\u2800\u2800\u2800\u2800\u2800\u2800\u2800\u2800\u28f4\u28ff\u287f\u281b\u2881\u2848\u281b\u28bf\u28ff\u28e6\u2800\u2800\u2800\u2800\u2800\u2800\u2800\u2800\u2800\u2800",
+    "\u2800\u2800\u2800\u2800\u2800\u2800\u2800\u2800\u2800\u2800\u283f\u28ff\u28e6\u28e4\u28c8\u2801\u28a0\u28f4\u28ff\u283f\u2800\u2800\u2800\u2800\u2800\u2800\u2800\u2800\u2800\u2800",
+    "\u2800\u2800\u2800\u2800\u2800\u2800\u2800\u2800\u2800\u2800\u2800\u2808\u2809\u283b\u28bf\u28ff\u28e6\u2849\u2801\u2800\u2800\u2800\u2800\u2800\u2800\u2800\u2800\u2800\u2800",
+    "\u2800\u2800\u2800\u2800\u2800\u2800\u2800\u2800\u2800\u2800\u2800\u2800\u2818\u28b7\u28e6\u28c8\u281b\u2803\u2800\u2800\u2800\u2800\u2800\u2800\u2800\u2800\u2800\u2800\u2800",
+    "\u2800\u2800\u2800\u2800\u2800\u2800\u2800\u2800\u2800\u2800\u2800\u28a0\u28f4\u2826\u2808\u2819\u283f\u28e6\u2844\u2800\u2800\u2800\u2800\u2800\u2800\u2800\u2800\u2800\u2800",
+    "\u2800\u2800\u2800\u2800\u2800\u2800\u2800\u2800\u2800\u2800\u2800\u2838\u28ff\u28e4\u2848\u2801\u28a4\u28ff\u2807\u2800\u2800\u2800\u2800\u2800\u2800\u2800\u2800\u2800\u2800",
+    "\u2800\u2800\u2800\u2800\u2800\u2800\u2800\u2800\u2800\u2800\u2800\u2800\u2800\u2809\u281b\u2837\u2804\u2800\u2800\u2800\u2800\u2800\u2800\u2800\u2800\u2800\u2800\u2800\u2800",
+    "\u2800\u2800\u2800\u2800\u2800\u2800\u2800\u2800\u2800\u2800\u2800\u2800\u2880\u28c0\u2811\u28b6\u28c4\u2840\u2800\u2800\u2800\u2800\u2800\u2800\u2800\u2800\u2800\u2800\u2800",
+    "\u2800\u2800\u2800\u2800\u2800\u2800\u2800\u2800\u2800\u2800\u2800\u2800\u28ff\u2801\u28b0\u2846\u2808\u287f\u2800\u2800\u2800\u2800\u2800\u2800\u2800\u2800\u2800\u2800\u2800",
+    "\u2800\u2800\u2800\u2800\u2800\u2800\u2800\u2800\u2800\u2800\u2800\u2800\u2808\u2833\u2808\u28e1\u281e\u2801\u2800\u2800\u2800\u2800\u2800\u2800\u2800\u2800\u2800\u2800\u2800",
+    "\u2800\u2800\u2800\u2800\u2800\u2800\u2800\u2800\u2800\u2800\u2800\u2800\u2800\u2800\u2800\u2808\u2800\u2800\u2800\u2800\u2800\u2800\u2800\u2800\u2800\u2800\u2800\u2800\u2800"
   ];
-  /* ── OpenWebUIChat (main component) ─────────────────────────── */
-  function OpenWebUIChat() {
+
+  /* ── WebUIChat (main component) ──────────────────────────────── */
+  function WebUIChat() {
     const [sessions, setSessions] = useState([]);
     const [activeSessionId, setActiveSessionId] = useState(null);
     const [messages, setMessages] = useState([]);
     const [inputValue, setInputValue] = useState("");
     const [isLoading, setIsLoading] = useState(false);
     const [streamingContent, setStreamingContent] = useState("");
-    const [sidebarOpen, setSidebarOpen] = useState(() => {
-      try {
-        return typeof window !== "undefined" && window.innerWidth >= 768;
-      } catch {
-        return true;
-      }
-    });
     const [error, setError] = useState(null);
     const [fontSize, setFontSize] = useState(() => {
       try {
@@ -245,8 +221,28 @@
         return 14;
       }
     });
+    const [sidebarOpen, setSidebarOpen] = useState(() => {
+      try {
+        const saved = localStorage.getItem("hermes-chat-sidebar");
+        return saved !== "false";
+      } catch {
+        return true;
+      }
+    });
     const messagesEndRef = useRef(null);
     const inputRef = useRef(null);
+
+    /* Handle ?resume=<session_id> from URL */
+    useEffect(() => {
+      const params = new URLSearchParams(window.location.search);
+      const resumeId = params.get("resume");
+      if (resumeId) {
+        setActiveSessionId(resumeId);
+        const url = new URL(window.location.href);
+        url.searchParams.delete("resume");
+        window.history.replaceState({}, "", url.toString());
+      }
+    }, []);
 
     /* Load session list */
     const refreshSessions = useCallback(() => {
@@ -274,8 +270,6 @@
             .filter((m) => {
               if (m.role === "user") return true;
               if (m.role === "assistant") {
-                // Skip assistant messages that are purely tool-call turns
-                // (no text content) — they look like empty bubbles.
                 const hasContent = typeof m.content === "string" && m.content.trim().length > 0;
                 return hasContent;
               }
@@ -310,20 +304,25 @@
       } catch {}
     }, [fontSize]);
 
+    /* Persist sidebar state */
+    useEffect(() => {
+      try {
+        localStorage.setItem("hermes-chat-sidebar", String(sidebarOpen));
+      } catch {}
+    }, [sidebarOpen]);
+
     const handleNewChat = useCallback(() => {
       setActiveSessionId(null);
       setMessages([]);
       setInputValue("");
       setStreamingContent("");
       setError(null);
-      setSidebarOpen(false);
     }, []);
 
     const handleSelectSession = useCallback((id) => {
       setActiveSessionId(id);
       setStreamingContent("");
       setError(null);
-      setSidebarOpen(false);
     }, []);
 
     const handleSend = useCallback(async () => {
@@ -337,7 +336,7 @@
       setMessages((prev) => [...prev, { role: "user", content: text }]);
 
       try {
-        const res = await fetch("/api/plugins/openwebui-chat/chat", {
+        const res = await fetch("/api/plugins/webui/chat", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ session_id: activeSessionId, message: text }),
@@ -389,9 +388,7 @@
                 setIsLoading(false);
                 streamDone = true;
               }
-            } catch (_) {
-              /* ignore malformed SSE lines */
-            }
+            } catch (_) {}
           }
         }
 
@@ -418,77 +415,60 @@
       [handleSend]
     );
 
-    /* ── Render ──────────────────────────────────────────────── */
     const hasContent = messages.length > 0 || streamingContent;
 
-    const renderInputBar = (centered) =>
+    /* ── Render ──────────────────────────────────────────────── */
+    return React.createElement(
+      "div",
+      { className: "flex flex-row h-full overflow-hidden normal-case" },
+
+      /* Sidebar */
       React.createElement(
         "div",
         {
           className: cn(
-            "w-full max-w-2xl mx-auto px-4",
-            centered ? "" : "border-t border-border p-3 md:p-4"
+            "flex flex-col h-full transition-all duration-300 ease-out overflow-hidden border-r border-border/30 shadow-lg min-w-0",
+            sidebarOpen
+              ? "w-72 flex-shrink-0 bg-background/70 backdrop-blur-xl"
+              : "w-0 opacity-0"
           ),
         },
-        React.createElement(
-          "div",
-          { className: "flex gap-2 items-end" },
-          React.createElement(Input, {
-            ref: inputRef,
-            value: inputValue,
-            onChange: (e) => setInputValue(e.target.value),
-            onKeyDown: handleKeyDown,
-            placeholder: "Message Hermes...",
-            disabled: isLoading,
-            className: "flex-1 min-h-[44px]",
-            style: fontSize ? { fontSize: `${fontSize}px` } : {},
-          }),
-          React.createElement(
-            Button,
-            {
-              onClick: handleSend,
-              disabled: isLoading || !inputValue.trim(),
-              size: "default",
-            },
-            isLoading ? "…" : "Send"
-          )
-        ),
-        !centered && activeSessionId &&
-          React.createElement(
-            "div",
-            { className: "text-[10px] text-muted-foreground text-center mt-1.5" },
-            "Session: ",
-            activeSessionId.slice(0, 20),
-            "…"
-          )
-      );
-
-    const renderSidebarContent = () =>
-      React.createElement(
-        React.Fragment,
-        null,
         /* Sidebar header */
         React.createElement(
           "div",
-          { className: "p-3 border-b border-border" },
+          { className: "p-3 border-b border-border/40 flex-shrink-0 flex flex-col gap-2 min-w-[18rem]" },
+          /* Row: toggle + new chat */
           React.createElement(
             "div",
             { className: "flex items-center gap-2" },
             React.createElement(
               Button,
+              {
+                onClick: () => setSidebarOpen(false),
+                size: "icon",
+                variant: "ghost",
+                className: "h-8 w-8 flex-shrink-0",
+                title: "Collapse sidebar",
+              },
+              React.createElement(
+                "svg",
+                { width: 16, height: 16, viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: 2, strokeLinecap: "round", strokeLinejoin: "round" },
+                React.createElement("rect", { x: 3, y: 3, width: 18, height: 18, rx: 2 }),
+                React.createElement("path", { d: "M9 3v18" }),
+                React.createElement("path", { d: "m14 9-3 3 3 3" })
+              )
+            ),
+            React.createElement(
+              Button,
               { onClick: handleNewChat, className: "flex-1", size: "sm" },
               "+ New Chat"
-            ),
+            )
           ),
-          /* Font size slider */
+          /* Row: font size slider */
           React.createElement(
             "div",
-            { className: "mt-3 flex items-center gap-2" },
-            React.createElement(
-              "span",
-              { className: "text-[10px] text-muted-foreground whitespace-nowrap" },
-              "A"
-            ),
+            { className: "flex items-center gap-2" },
+            React.createElement("span", { className: "text-[10px] text-muted-foreground" }, "A"),
             React.createElement("input", {
               type: "range",
               min: 12,
@@ -497,17 +477,13 @@
               onChange: (e) => setFontSize(parseInt(e.target.value, 10)),
               className: "flex-1 h-1 appearance-none bg-border rounded-full cursor-pointer accent-primary",
             }),
-            React.createElement(
-              "span",
-              { className: "text-[11px] text-muted-foreground whitespace-nowrap" },
-              fontSize + "px"
-            )
+            React.createElement("span", { className: "text-[11px] text-muted-foreground" }, fontSize + "px")
           )
         ),
         /* Session list */
         React.createElement(
           "div",
-          { className: "flex-1 overflow-y-auto" },
+          { className: "flex-1 overflow-y-auto min-h-0 min-w-[18rem]" },
           sessions.length === 0 &&
             React.createElement(
               "div",
@@ -523,105 +499,73 @@
             })
           )
         )
-      );
-
-    return React.createElement(
-      "div",
-      {
-        className: "flex flex-col w-full overflow-hidden relative normal-case",
-        style: { minHeight: "calc(100dvh - 100px)" },
-      },
-
-      /* Mobile toggle */
-      React.createElement(MobileToggle, {
-        sidebarOpen,
-        onToggle: () => setSidebarOpen((v) => !v),
-      }),
-
-      /* Sidebar */
-      React.createElement(
-        "div",
-        {
-          className: cn(
-            "flex flex-col bg-background border-r border-border",
-            "absolute z-40 w-72 shadow-xl",
-            "transition-transform duration-200 ease-in-out",
-            sidebarOpen ? "translate-x-0" : "-translate-x-full"
-          ),
-          style: { height: "calc(100dvh - 100px)" },
-        },
-        renderSidebarContent()
       ),
-
-      /* Overlay for mobile sidebar */
-      sidebarOpen &&
-        React.createElement("div", {
-          className: "md:hidden fixed inset-0 bg-black/30 z-30",
-          onClick: () => setSidebarOpen(false),
-        }),
 
       /* Main chat area */
       React.createElement(
         "div",
-        { className: "flex flex-col flex-1 min-w-0 relative" },
+        { className: "flex flex-col flex-1 min-w-0 h-full relative" },
+        /* Floating toggle when sidebar collapsed */
+        !sidebarOpen &&
+          React.createElement(
+            "div",
+            { className: "absolute top-2 left-2 z-10" },
+            React.createElement(
+              Button,
+              {
+                onClick: () => setSidebarOpen(true),
+                size: "icon",
+                variant: "ghost",
+                className: "h-8 w-8 bg-background/60 backdrop-blur-sm hover:bg-background/80 shadow-sm border border-border/30",
+                title: "Open sidebar",
+              },
+              React.createElement(
+                "svg",
+                { width: 16, height: 16, viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: 2, strokeLinecap: "round", strokeLinejoin: "round" },
+                React.createElement("line", { x1: 3, y1: 12, x2: 21, y2: 12 }),
+                React.createElement("line", { x1: 3, y1: 6, x2: 21, y2: 6 }),
+                React.createElement("line", { x1: 3, y1: 18, x2: 21, y2: 18 })
+              )
+            )
+          ),
 
-        /* ── Empty state: centered hero with caduceus ── */
+        /* Empty state */
         !hasContent &&
           React.createElement(
             "div",
-            { className: "flex-1 flex flex-col items-center px-4" },
-            /* Caduceus + branding — centered vertically */
+            { className: "flex-1 flex flex-col items-center justify-center px-4 overflow-y-auto" },
             React.createElement(
               "div",
-              { className: "flex-1 flex flex-col items-center justify-center" },
-              /* Caduceus ASCII art */
-              React.createElement(
-                "div",
-                {
-                  className: "flex flex-col items-center mb-6 select-none",
-                  style: { fontFamily: "monospace", lineHeight: 1.15 },
-                },
-                CADUCEUS_ART.map((line, i) =>
-                  React.createElement(
-                    "div",
-                    {
-                      key: i,
-                      className: cn(
-                        "text-xs md:text-sm whitespace-pre",
-                        i < 4 ? "text-amber-400" :
-                        i < 8 ? "text-yellow-500" :
-                        i < 12 ? "text-amber-600" : "text-yellow-700"
-                      ),
-                    },
-                    line
-                  )
+              { className: "flex flex-col items-center mb-6 select-none", style: { fontFamily: "monospace", lineHeight: 1.15 } },
+              CADUCEUS_ART.map((line, i) =>
+                React.createElement(
+                  "div",
+                  {
+                    key: i,
+                    className: cn(
+                      "text-xs md:text-sm whitespace-pre",
+                      i < 4 ? "text-amber-400" :
+                      i < 8 ? "text-yellow-500" :
+                      i < 12 ? "text-amber-600" : "text-yellow-700"
+                    ),
+                  },
+                  line
                 )
-              ),
-              /* Branding */
-              React.createElement(
-                "h1",
-                { className: "text-2xl md:text-3xl font-bold text-foreground tracking-tight mb-1" },
-                "Nous Hermes"
-              ),
-              React.createElement(
-                "p",
-                { className: "text-sm text-muted-foreground" },
-                "Messenger of the Digital Gods"
               )
             ),
-            /* Input bar at bottom */
-            renderInputBar(true)
+            React.createElement("h1", { className: "text-2xl md:text-3xl font-bold text-foreground tracking-tight mb-1" }, "Nous Hermes"),
+            React.createElement("p", { className: "text-sm text-muted-foreground" }, "Messenger of the Digital Gods")
           ),
 
-        /* ── Active state: messages flow from top ── */
+        /* Active chat */
         hasContent &&
           React.createElement(
-            "div",
-            { className: "flex flex-col flex-1" },
+            React.Fragment,
+            null,
             /* Messages scroll area */
             React.createElement(
               "div",
-              { className: "flex-1 overflow-y-auto px-4 py-4 md:px-6" },
+              { className: "flex-1 overflow-y-auto min-h-0 px-4 py-4 md:px-6" },
               error &&
                 React.createElement(
                   "div",
@@ -645,13 +589,47 @@
                 }),
               React.createElement("div", { ref: messagesEndRef })
             ),
-            /* Input bar pinned at bottom */
-            renderInputBar(false)
+            /* Input bar */
+            React.createElement(
+              "div",
+              { className: "flex-shrink-0 border-t border-border p-3 md:p-4" },
+              React.createElement(
+                "div",
+                { className: "flex gap-2 items-end max-w-3xl mx-auto" },
+                React.createElement(Input, {
+                  ref: inputRef,
+                  value: inputValue,
+                  onChange: (e) => setInputValue(e.target.value),
+                  onKeyDown: handleKeyDown,
+                  placeholder: "Message Hermes...",
+                  disabled: isLoading,
+                  className: "flex-1 min-h-[44px]",
+                  style: fontSize ? { fontSize: `${fontSize}px` } : {},
+                }),
+                React.createElement(
+                  Button,
+                  {
+                    onClick: handleSend,
+                    disabled: isLoading || !inputValue.trim(),
+                    size: "default",
+                  },
+                  isLoading ? "\u2026" : "Send"
+                )
+              ),
+              activeSessionId &&
+                React.createElement(
+                  "div",
+                  { className: "text-[10px] text-muted-foreground text-center mt-1.5" },
+                  "Session: ",
+                  activeSessionId.slice(0, 20),
+                  "\u2026"
+                )
+            )
           )
       )
     );
   }
 
-  /* Register the plugin tab */
-  window.__HERMES_PLUGINS__.register("openwebui-chat", OpenWebUIChat);
+  /* Register */
+  window.__HERMES_PLUGINS__.register("webui", WebUIChat);
 })();

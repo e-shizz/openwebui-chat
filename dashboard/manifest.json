@@ -1,11 +1,11 @@
 {
-  "name": "openwebui-chat",
+  "name": "webui",
   "label": "Web Chat",
-  "description": "OpenWebUI-style native chat for Hermes — no terminal required",
+  "description": "WebUI-style native chat for Hermes \u2014 no terminal required",
   "icon": "MessageSquare",
   "version": "1.0.0",
   "tab": {
-    "path": "/openwebui-chat",
+    "path": "/webui",
     "position": "after:chat"
   },
   "entry": "dist/index.js",
