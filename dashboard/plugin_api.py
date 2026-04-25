@@ -11,8 +11,8 @@ import traceback
 from pathlib import Path
 from typing import Optional
 
-from fastapi import APIRouter, Request
-from fastapi.responses import StreamingResponse
+from fastapi import APIRouter, Request, HTTPException
+from fastapi.responses import StreamingResponse, FileResponse
 
 router = APIRouter()
 
@@ -167,4 +167,70 @@ async def chat_endpoint(request: Request):
             "Cache-Control": "no-cache",
             "X-Accel-Buffering": "no",
         },
+    )
+
+
+@router.post("/tts")
+async def tts_endpoint(request: Request):
+    """Generate TTS audio for given text using Hermes' configured TTS provider.
+
+    Body: {"text": "..."}
+    Returns: {"success": true, "audio_url": "/api/plugins/webui/audio?path=..."}
+             {"success": false, "error": "..."}
+    """
+    body = await request.json()
+    text = (body.get("text") or "").strip()
+
+    if not text:
+        return {"success": False, "error": "Text is required"}
+
+    try:
+        from tools.tts_tool import text_to_speech_tool
+        result_json = text_to_speech_tool(text=text)
+        result = json.loads(result_json)
+
+        if not result.get("success"):
+            return {"success": False, "error": result.get("error", "TTS generation failed")}
+
+        file_path = result.get("file_path")
+        if not file_path or not Path(file_path).exists():
+            return {"success": False, "error": "Audio file not found after generation"}
+
+        # Return a URL to our audio-serving endpoint
+        return {
+            "success": True,
+            "audio_url": f"/api/plugins/webui/audio?path={file_path}",
+            "provider": result.get("provider"),
+        }
+    except Exception as exc:
+        return {"success": False, "error": str(exc), "detail": traceback.format_exc()}
+
+
+@router.get("/audio")
+async def audio_endpoint(path: str):
+    """Serve a TTS-generated audio file from disk."""
+    file_path = Path(path).resolve()
+    # Security: only serve files inside the hermes home or known TTS dirs
+    allowed_roots = [
+        Path.home() / "voice-memos",
+        Path.home() / ".hermes" / "cache" / "audio",
+    ]
+    # Also allow if parent is voice-memos or audio cache
+    if not any(str(file_path).startswith(str(r)) for r in allowed_roots):
+        raise HTTPException(status_code=403, detail="Access denied")
+
+    if not file_path.exists() or not file_path.is_file():
+        raise HTTPException(status_code=404, detail="Audio file not found")
+
+    # Guess content type from extension
+    content_type = "audio/mpeg"
+    if file_path.suffix == ".ogg":
+        content_type = "audio/ogg"
+    elif file_path.suffix == ".wav":
+        content_type = "audio/wav"
+
+    return FileResponse(
+        str(file_path),
+        media_type=content_type,
+        headers={"Cache-Control": "public, max-age=3600"},
     )

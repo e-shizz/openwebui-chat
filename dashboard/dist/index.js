@@ -103,10 +103,40 @@
     );
   }
 
-  /* ── ChatBubble ──────────────────────────────────────────────── */
+  /* ── ChatBubble ─────────────────────────────────────────────── */
   function ChatBubble({ role, content, isStreaming, fontSize }) {
     const isUser = role === "user";
     const textStyle = fontSize ? { fontSize: `${fontSize}px`, lineHeight: 1.6 } : {};
+    const [isPlaying, setIsPlaying] = useState(false);
+    const [audioError, setAudioError] = useState(null);
+
+    const handlePlayTTS = useCallback(async () => {
+      if (isPlaying || !content) return;
+      setIsPlaying(true);
+      setAudioError(null);
+      try {
+        const res = await fetch("/api/plugins/webui/tts", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ text: content }),
+        });
+        const data = await res.json();
+        if (!data.success || !data.audio_url) {
+          throw new Error(data.error || "TTS failed");
+        }
+        const audio = new Audio(data.audio_url);
+        audio.onended = () => setIsPlaying(false);
+        audio.onerror = () => {
+          setAudioError("Audio playback failed");
+          setIsPlaying(false);
+        };
+        await audio.play();
+      } catch (err) {
+        console.error("TTS error:", err);
+        setAudioError(err.message);
+        setIsPlaying(false);
+      }
+    }, [isPlaying, content]);
 
     if (isUser) {
       return React.createElement(
@@ -174,8 +204,52 @@
 
     return React.createElement(
       "div",
-      { className: "flex w-full mb-3 justify-start" },
-      React.createElement("div", { className: "max-w-[85%] text-sm leading-relaxed" }, children)
+      { className: "flex w-full mb-3 justify-start group" },
+      React.createElement(
+        "div",
+        { className: "max-w-[85%] text-sm leading-relaxed" },
+        children,
+        /* Action row: TTS play button */
+        !isStreaming &&
+          React.createElement(
+            "div",
+            { className: "flex items-center gap-2 mt-1 opacity-0 group-hover:opacity-100 transition-opacity duration-150" },
+            React.createElement(
+              "button",
+              {
+                onClick: handlePlayTTS,
+                disabled: isPlaying,
+                className: "flex items-center gap-1 px-2 py-0.5 rounded text-[10px] text-muted-foreground hover:text-foreground hover:bg-accent/50 cursor-pointer border border-border/30 disabled:opacity-50",
+                title: isPlaying ? "Playing..." : "Read aloud (TTS)",
+              },
+              isPlaying
+                ? React.createElement(
+                    React.Fragment,
+                    null,
+                    React.createElement(
+                      "svg",
+                      { width: 10, height: 10, viewBox: "0 0 24 24", fill: "currentColor" },
+                      React.createElement("rect", { x: 6, y: 4, width: 4, height: 16 }),
+                      React.createElement("rect", { x: 14, y: 4, width: 4, height: 16 })
+                    ),
+                    "Playing..."
+                  )
+                : React.createElement(
+                    React.Fragment,
+                    null,
+                    React.createElement(
+                      "svg",
+                      { width: 10, height: 10, viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: 2 },
+                      React.createElement("polygon", { points: "11 5 6 9 2 9 2 15 6 15 11 19 11 5" }),
+                      React.createElement("path", { d: "M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07" })
+                    ),
+                    "Listen"
+                  )
+            ),
+            audioError &&
+              React.createElement("span", { className: "text-[10px] text-destructive" }, audioError)
+          )
+      )
     );
   }
 
