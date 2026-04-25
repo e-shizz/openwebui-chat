@@ -86,6 +86,10 @@ async def chat_endpoint(request: Request):
         return {"error": "Message is required"}
 
     config = _load_agent_config()
+    # Allow frontend to override the model per-request
+    override_model = body.get("model")
+    if override_model and isinstance(override_model, str) and override_model.strip():
+        config["model"] = override_model.strip()
 
     from run_agent import AIAgent
     from hermes_state import SessionDB
@@ -214,6 +218,7 @@ async def audio_endpoint(path: str):
     allowed_roots = [
         Path.home() / "voice-memos",
         Path.home() / ".hermes" / "cache" / "audio",
+        Path.home() / ".hermes" / "audio_cache",
     ]
     # Also allow if parent is voice-memos or audio cache
     if not any(str(file_path).startswith(str(r)) for r in allowed_roots):

@@ -351,8 +351,63 @@
         return true;
       }
     });
+    const [availableModels, setAvailableModels] = useState([]);
+    const [selectedModel, setSelectedModel] = useState(() => {
+      try {
+        return localStorage.getItem("hermes-chat-selected-model") || "";
+      } catch {
+        return "";
+      }
+    });
+    const [modelInfo, setModelInfo] = useState(null);
     const messagesEndRef = useRef(null);
     const inputRef = useRef(null);
+
+    /* Fetch available models from config + model info */
+    useEffect(() => {
+      Promise.all([
+        api.getConfig().catch(() => null),
+        api.getModelInfo().catch(() => null),
+      ]).then(([cfg, info]) => {
+        setModelInfo(info);
+        const models = new Set();
+        // Add current model from config
+        if (cfg && cfg.model) {
+          if (typeof cfg.model === "string") {
+            models.add(cfg.model);
+          } else if (cfg.model && typeof cfg.model === "object") {
+            if (cfg.model.default) models.add(cfg.model.default);
+            if (cfg.model.name) models.add(cfg.model.name);
+          }
+        }
+        // Add model from modelInfo
+        if (info && info.model) {
+          models.add(info.model);
+        }
+        // Add any explicit models list from config
+        if (cfg && Array.isArray(cfg.models)) {
+          cfg.models.forEach((m) => {
+            if (typeof m === "string") models.add(m);
+            else if (m && typeof m === "object" && m.name) models.add(m.name);
+          });
+        }
+        const modelList = Array.from(models).filter(Boolean);
+        setAvailableModels(modelList);
+        // If no model is selected, default to the first available
+        if (!selectedModel && modelList.length > 0) {
+          setSelectedModel(modelList[0]);
+        }
+      });
+    }, []);
+
+    /* Persist selected model */
+    useEffect(() => {
+      try {
+        if (selectedModel) {
+          localStorage.setItem("hermes-chat-selected-model", selectedModel);
+        }
+      } catch {}
+    }, [selectedModel]);
 
     /* Handle ?resume=<session_id> from URL */
     useEffect(() => {
@@ -476,7 +531,11 @@
         const res = await fetch("/api/plugins/webui/chat", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ session_id: activeSessionId, message: text }),
+          body: JSON.stringify({
+            session_id: activeSessionId,
+            message: text,
+            model: selectedModel || undefined,
+          }),
         });
 
         if (!res.ok) {
@@ -540,7 +599,7 @@
         ]);
         setIsLoading(false);
       }
-    }, [inputValue, isLoading, activeSessionId, refreshSessions]);
+    }, [inputValue, isLoading, activeSessionId, selectedModel, refreshSessions]);
 
     const handleKeyDown = useCallback(
       (e) => {
@@ -605,6 +664,31 @@
               "+ New Chat"
             )
           ),
+          /* Row: model selector */
+          availableModels.length > 0 &&
+            React.createElement(
+              "div",
+              { className: "flex items-center gap-2" },
+              React.createElement(
+                "svg",
+                { width: 14, height: 14, viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: 2, strokeLinecap: "round", strokeLinejoin: "round", className: "text-muted-foreground flex-shrink-0" },
+                React.createElement("path", { d: "M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z" }),
+                React.createElement("polyline", { points: "3.27 6.96 12 12.01 20.73 6.96" }),
+                React.createElement("line", { x1: 12, y1: 22.08, x2: 12, y2: 12 })
+              ),
+              React.createElement(
+                "select",
+                {
+                  value: selectedModel,
+                  onChange: (e) => setSelectedModel(e.target.value),
+                  className: "flex-1 h-8 px-2 text-xs bg-background border border-border/50 rounded-md text-foreground focus:outline-none focus:ring-1 focus:ring-ring focus:border-ring cursor-pointer normal-case tracking-normal",
+                  title: "Select model for new chats",
+                },
+                availableModels.map((m) =>
+                  React.createElement("option", { key: m, value: m, className: "bg-background text-foreground" }, m)
+                )
+              )
+            ),
           /* Row: font size slider */
           React.createElement(
             "div",
@@ -755,10 +839,17 @@
           activeSessionId &&
             React.createElement(
               "div",
-              { className: "text-[10px] text-muted-foreground text-center mt-1.5" },
+              { className: "text-[10px] text-muted-foreground text-center mt-1" },
               "Session: ",
               activeSessionId.slice(0, 20),
               "\u2026"
+            ),
+          selectedModel &&
+            React.createElement(
+              "div",
+              { className: "text-[10px] text-muted-foreground text-center mt-0.5" },
+              "Model: ",
+              selectedModel
             )
         )
       )
