@@ -164,41 +164,80 @@
 
     function parseSegments(text) {
       if (!text) return [{ type: "text", content: "" }];
-      const segments = [];
-      const regex = /```(\w*)\n?([\s\S]*?)```/g;
+      // Step 1: split by code blocks
+      const rawSegments = [];
+      const codeRegex = /```(\w*)\n?([\s\S]*?)```/g;
       let lastIndex = 0;
       let match;
-      while ((match = regex.exec(text)) !== null) {
+      while ((match = codeRegex.exec(text)) !== null) {
         if (match.index > lastIndex) {
-          segments.push({ type: "text", content: text.slice(lastIndex, match.index) });
+          rawSegments.push({ type: "text", content: text.slice(lastIndex, match.index) });
         }
-        segments.push({ type: "code", lang: match[1], content: match[2] });
-        lastIndex = regex.lastIndex;
+        rawSegments.push({ type: "code", lang: match[1], content: match[2] });
+        lastIndex = codeRegex.lastIndex;
       }
       if (lastIndex < text.length) {
-        segments.push({ type: "text", content: text.slice(lastIndex) });
+        rawSegments.push({ type: "text", content: text.slice(lastIndex) });
+      }
+      // Step 2: split text segments by markdown images ![alt](url)
+      const segments = [];
+      const imgRegex = /!\[([^\]]*)\]\(([^)]+)\)/g;
+      for (const seg of rawSegments) {
+        if (seg.type !== "text") {
+          segments.push(seg);
+          continue;
+        }
+        let imgLast = 0;
+        let imgMatch;
+        while ((imgMatch = imgRegex.exec(seg.content)) !== null) {
+          if (imgMatch.index > imgLast) {
+            segments.push({ type: "text", content: seg.content.slice(imgLast, imgMatch.index) });
+          }
+          segments.push({ type: "image", alt: imgMatch[1], url: imgMatch[2] });
+          imgLast = imgRegex.lastIndex;
+        }
+        if (imgLast < seg.content.length) {
+          segments.push({ type: "text", content: seg.content.slice(imgLast) });
+        }
       }
       return segments.length ? segments : [{ type: "text", content: text }];
     }
 
     const segments = parseSegments(content);
-    const children = segments.map((seg, i) =>
-      seg.type === "text"
-        ? React.createElement(
-            "div",
-            { key: i, className: "whitespace-pre-wrap break-words text-foreground py-1", style: textStyle },
-            seg.content
-          )
-        : React.createElement(CodeBlock, { key: i, code: seg.content, lang: seg.lang, fontSize })
-    );
+    const children = segments.map((seg, i) => {
+      if (seg.type === "text") {
+        return React.createElement(
+          "div",
+          { key: i, className: "whitespace-pre-wrap break-words text-foreground py-1", style: textStyle },
+          seg.content
+        );
+      }
+      if (seg.type === "code") {
+        return React.createElement(CodeBlock, { key: i, code: seg.content, lang: seg.lang, fontSize });
+      }
+      if (seg.type === "image") {
+        return React.createElement(
+          "div",
+          { key: i, className: "my-2 rounded-lg overflow-hidden border border-border/30 shadow-sm" },
+          React.createElement("img", {
+            src: seg.url,
+            alt: seg.alt || "Image",
+            className: "max-w-full h-auto block",
+            loading: "lazy",
+            onError: (e) => { e.target.style.display = "none"; },
+          })
+        );
+      }
+      return null;
+    });
 
-    // Render generated images after text content
+    // Render generated images from tool calls (passed as prop) after text content
     if (images && images.length > 0) {
       images.forEach((url, idx) => {
         children.push(
           React.createElement(
             "div",
-            { key: `img-${idx}`, className: "my-2 rounded-lg overflow-hidden border border-border/30 shadow-sm" },
+            { key: `toolimg-${idx}`, className: "my-2 rounded-lg overflow-hidden border border-border/30 shadow-sm" },
             React.createElement("img", {
               src: url,
               alt: "Generated image",
@@ -445,20 +484,66 @@
       api
         .getSessionMessages(activeSessionId)
         .then((data) => {
-          const filtered = (data.messages || [])
-            .filter((m) => {
-              if (m.role === "user") return true;
-              if (m.role === "assistant") {
-                const hasContent = typeof m.content === "string" && m.content.trim().length > 0;
-                return hasContent;
+          const allMsgs = data.messages || [];
+          const displayMsgs = [];
+          let lastAssistantIdx = -1;
+
+          for (const m of allMsgs) {
+            if (m.role === "user") {
+              displayMsgs.push({
+                role: m.role,
+                content: typeof m.content === "string" ? m.content : "",
+                images: [],
+              });
+              continue;
+            }
+            if (m.role === "assistant") {
+              const content = typeof m.content === "string" ? m.content : "";
+              // Skip empty assistant messages UNLESS they have tool_use (which we handle via tool messages)
+              if (content.trim().length > 0) {
+                displayMsgs.push({ role: m.role, content, images: [] });
+                lastAssistantIdx = displayMsgs.length - 1;
               }
-              return false;
-            })
-            .map((m) => ({
-              role: m.role,
-              content: typeof m.content === "string" ? m.content : "",
-            }));
-          setMessages(filtered);
+              continue;
+            }
+            if (m.role === "tool" && lastAssistantIdx >= 0) {
+              // Try to parse tool result JSON and extract image URLs
+              try {
+                const toolContent = typeof m.content === "string" ? m.content : "";
+                const toolResult = JSON.parse(toolContent);
+                // Look for image URLs in common fields
+                const urls = [];
+                if (toolResult.image_url) urls.push(toolResult.image_url);
+                if (toolResult.url) urls.push(toolResult.url);
+                if (toolResult.images && Array.isArray(toolResult.images)) {
+                  urls.push(...toolResult.images);
+                }
+                if (urls.length > 0) {
+                  const target = displayMsgs[lastAssistantIdx];
+                  if (target) {
+                    target.images = target.images || [];
+                    for (const u of urls) {
+                      if (!target.images.includes(u)) target.images.push(u);
+                    }
+                  }
+                }
+              } catch (_) {
+                // Not JSON or no images — ignore
+              }
+            }
+          }
+          // Also scan assistant messages for inline markdown images
+          for (const m of displayMsgs) {
+            if (m.role !== "assistant" || !m.content) continue;
+            const imgRegex = /!\[([^\]]*)\]\(([^)]+)\)/g;
+            let match;
+            while ((match = imgRegex.exec(m.content)) !== null) {
+              const url = match[2];
+              m.images = m.images || [];
+              if (!m.images.includes(url)) m.images.push(url);
+            }
+          }
+          setMessages(displayMsgs);
         })
         .catch((err) => {
           console.error("Failed to load messages:", err);
@@ -569,9 +654,21 @@
                 setStreamingContent((prev) => prev + (msg.content || ""));
               } else if (msg.type === "done") {
                 currentSessionId = msg.session_id;
+                // Extract markdown images from the result text too
+                const resultText = msg.result || "";
+                const mdImages = [];
+                const imgRegex = /!\[([^\]]*)\]\(([^)]+)\)/g;
+                let match;
+                while ((match = imgRegex.exec(resultText)) !== null) {
+                  if (!mdImages.includes(match[2])) mdImages.push(match[2]);
+                }
+                const allImages = [...(msg.images || [])];
+                for (const u of mdImages) {
+                  if (!allImages.includes(u)) allImages.push(u);
+                }
                 setMessages((prev) => [
                   ...prev,
-                  { role: "assistant", content: msg.result || "", images: msg.images || [] },
+                  { role: "assistant", content: resultText, images: allImages },
                 ]);
                 setStreamingContent("");
                 setIsLoading(false);
