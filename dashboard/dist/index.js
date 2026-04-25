@@ -363,41 +363,25 @@
     const messagesEndRef = useRef(null);
     const inputRef = useRef(null);
 
-    /* Fetch available models from config + model info */
+    /* Fetch available models from backend (live API + fallback) */
     useEffect(() => {
-      Promise.all([
-        api.getConfig().catch(() => null),
-        api.getModelInfo().catch(() => null),
-      ]).then(([cfg, info]) => {
-        setModelInfo(info);
-        const models = new Set();
-        // Add current model from config
-        if (cfg && cfg.model) {
-          if (typeof cfg.model === "string") {
-            models.add(cfg.model);
-          } else if (cfg.model && typeof cfg.model === "object") {
-            if (cfg.model.default) models.add(cfg.model.default);
-            if (cfg.model.name) models.add(cfg.model.name);
+      fetch("/api/plugins/webui/models")
+        .then((r) => r.json())
+        .then((data) => {
+          const modelList = (data.models || []).filter(Boolean);
+          setAvailableModels(modelList);
+          // If no model is selected, default to current_model from backend
+          const current = data.current_model || (modelList[0] || "");
+          if (!selectedModel && current) {
+            setSelectedModel(current);
+          } else if (selectedModel && !modelList.includes(selectedModel)) {
+            // If previously selected model is no longer available, reset
+            setSelectedModel(current);
           }
-        }
-        // Add model from modelInfo
-        if (info && info.model) {
-          models.add(info.model);
-        }
-        // Add any explicit models list from config
-        if (cfg && Array.isArray(cfg.models)) {
-          cfg.models.forEach((m) => {
-            if (typeof m === "string") models.add(m);
-            else if (m && typeof m === "object" && m.name) models.add(m.name);
-          });
-        }
-        const modelList = Array.from(models).filter(Boolean);
-        setAvailableModels(modelList);
-        // If no model is selected, default to the first available
-        if (!selectedModel && modelList.length > 0) {
-          setSelectedModel(modelList[0]);
-        }
-      });
+        })
+        .catch((err) => {
+          console.error("Failed to load models:", err);
+        });
     }, []);
 
     /* Persist selected model */

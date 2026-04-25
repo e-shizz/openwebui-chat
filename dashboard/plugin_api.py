@@ -41,7 +41,13 @@ def _load_agent_config():
 
     model = cfg.get("model", "")
     if isinstance(model, dict):
-        model = model.get("default", model.get("name", ""))
+        model_name = model.get("default", model.get("name", ""))
+        model_provider = model.get("provider", "")
+        model_base_url = model.get("base_url", "")
+    else:
+        model_name = str(model) if model else ""
+        model_provider = ""
+        model_base_url = ""
 
     api_key = (
         env.get("OPENAI_API_KEY")
@@ -49,22 +55,94 @@ def _load_agent_config():
         or env.get("XAI_API_KEY")
         or env.get("GEMINI_API_KEY")
         or env.get("NOUS_API_KEY")
+        or env.get("OPENCODE_GO_API_KEY")
+        or env.get("OPENROUTER_API_KEY")
+        or env.get("DEEPSEEK_API_KEY")
         or cfg.get("api_key")
     )
-    base_url = cfg.get("base_url") or env.get("OPENAI_BASE_URL")
-    provider = cfg.get("provider")
-    api_mode = cfg.get("api_mode")
+    base_url = cfg.get("base_url") or model_base_url or env.get("OPENAI_BASE_URL")
+    provider = cfg.get("provider") or model_provider
+    api_mode = cfg.get("api_mode") or (model.get("api_mode") if isinstance(model, dict) else None)
     max_iterations = cfg.get("max_iterations", 90)
     if not isinstance(max_iterations, int):
         max_iterations = 90
 
     return {
-        "model": model,
+        "model": model_name,
         "api_key": api_key,
         "base_url": base_url,
         "provider": provider,
         "api_mode": api_mode,
         "max_iterations": max_iterations,
+    }
+
+
+@router.get("/models")
+async def models_endpoint():
+    """Return available models for the configured provider.
+
+    Tries live API first (using the provider's /models endpoint),
+    falls back to static curated catalog if unreachable.
+    Always includes the currently configured model.
+    """
+    config = _load_agent_config()
+    provider = config.get("provider") or ""
+    base_url = config.get("base_url")
+    api_key = config.get("api_key")
+    api_mode = config.get("api_mode")
+    current_model = config.get("model", "")
+
+    models = []
+    source = "static"
+
+    # 1. Try live API probe first (works for most OpenAI-compatible providers)
+    if base_url:
+        try:
+            from hermes_cli.models import probe_api_models
+            result = probe_api_models(api_key, base_url, timeout=5.0, api_mode=api_mode)
+            live_models = result.get("models")
+            if live_models:
+                models = list(live_models)
+                source = "live"
+        except Exception:
+            pass
+
+    # 2. Provider-specific live fetches for providers that don't use base_url
+    if not models and provider:
+        try:
+            from hermes_cli.models import (
+                normalize_provider,
+                _fetch_anthropic_models,
+                _fetch_ai_gateway_models,
+                _PROVIDER_MODELS,
+            )
+            normalized = normalize_provider(provider)
+
+            if normalized == "anthropic":
+                live = _fetch_anthropic_models()
+                if live:
+                    models = live
+                    source = "live"
+            elif normalized == "ai-gateway":
+                live = _fetch_ai_gateway_models()
+                if live:
+                    models = live
+                    source = "live"
+            elif normalized in _PROVIDER_MODELS:
+                models = list(_PROVIDER_MODELS[normalized])
+                source = "static"
+        except Exception:
+            pass
+
+    # 3. Ensure current model is always included
+    if current_model and current_model not in models:
+        models.insert(0, current_model)
+
+    return {
+        "models": models,
+        "source": source,
+        "provider": provider,
+        "current_model": current_model,
     }
 
 
