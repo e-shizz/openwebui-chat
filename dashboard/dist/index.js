@@ -926,15 +926,22 @@
           React.createElement(
             "div",
             { className: "flex gap-2 items-end" },
-            React.createElement(Input, {
+            React.createElement("textarea", {
               ref: inputRef,
               value: inputValue,
-              onChange: (e) => setInputValue(e.target.value),
+              onChange: (e) => {
+                setInputValue(e.target.value);
+                // Auto-resize
+                e.target.style.height = "auto";
+                e.target.style.height = Math.min(e.target.scrollHeight, 200) + "px";
+              },
               onKeyDown: handleKeyDown,
               placeholder: "Message Hermes...",
               disabled: isLoading,
-              className: "flex-1 min-h-[44px]",
-              style: fontSize ? { fontSize: `${fontSize}px` } : {},
+              rows: 1,
+              className:
+                "flex-1 min-h-[44px] max-h-[200px] resize-none rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50",
+              style: fontSize ? { fontSize: `${fontSize}px`, lineHeight: 1.5 } : { lineHeight: 1.5 },
             }),
             React.createElement(
               Button,
