@@ -104,7 +104,7 @@
   }
 
   /* ── ChatBubble ─────────────────────────────────────────────── */
-  function ChatBubble({ role, content, isStreaming, fontSize }) {
+  function ChatBubble({ role, content, isStreaming, fontSize, images }) {
     const isUser = role === "user";
     const textStyle = fontSize ? { fontSize: `${fontSize}px`, lineHeight: 1.6 } : {};
     const [isPlaying, setIsPlaying] = useState(false);
@@ -191,6 +191,25 @@
           )
         : React.createElement(CodeBlock, { key: i, code: seg.content, lang: seg.lang, fontSize })
     );
+
+    // Render generated images after text content
+    if (images && images.length > 0) {
+      images.forEach((url, idx) => {
+        children.push(
+          React.createElement(
+            "div",
+            { key: `img-${idx}`, className: "my-2 rounded-lg overflow-hidden border border-border/30 shadow-sm" },
+            React.createElement("img", {
+              src: url,
+              alt: "Generated image",
+              className: "max-w-full h-auto block",
+              loading: "lazy",
+              onError: (e) => { e.target.style.display = "none"; },
+            })
+          )
+        );
+      });
+    }
 
     if (isStreaming) {
       children.push(
@@ -552,7 +571,7 @@
                 currentSessionId = msg.session_id;
                 setMessages((prev) => [
                   ...prev,
-                  { role: "assistant", content: msg.result || "" },
+                  { role: "assistant", content: msg.result || "", images: msg.images || [] },
                 ]);
                 setStreamingContent("");
                 setIsLoading(false);
@@ -780,6 +799,7 @@
                   role: msg.role,
                   content: msg.content,
                   fontSize,
+                  images: msg.images,
                 })
               ),
               streamingContent &&
@@ -788,6 +808,7 @@
                   content: streamingContent,
                   isStreaming: true,
                   fontSize,
+                  images: [],
                 }),
               React.createElement("div", { ref: messagesEndRef })
             ),

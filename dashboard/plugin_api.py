@@ -32,6 +32,50 @@ if _HERMES_ROOT and str(_HERMES_ROOT) not in sys.path:
     sys.path.insert(0, str(_HERMES_ROOT))
 
 
+def _extract_images_from_messages(messages):
+    """Scan conversation messages for image_generate_tool results and return image URLs.
+
+    Tool results are stored as role='tool' messages with JSON content.
+    The image_generate_tool returns: {"success": true, "image": "https://..."}
+    """
+    images = []
+    if not messages:
+        return images
+    for msg in messages:
+        if not isinstance(msg, dict):
+            continue
+        if msg.get("role") != "tool":
+            continue
+        content = msg.get("content", "")
+        if not isinstance(content, str) or not content.strip():
+            continue
+        try:
+            data = json.loads(content)
+            if data.get("success"):
+                # image_generate_tool returns a single "image" URL
+                url = data.get("image")
+                if url and isinstance(url, str) and url.startswith("http"):
+                    images.append(url)
+                # Some tools may return an "images" array
+                for img in data.get("images", []):
+                    if isinstance(img, dict):
+                        url = img.get("url")
+                    else:
+                        url = img
+                    if url and isinstance(url, str) and url.startswith("http"):
+                        images.append(url)
+        except (json.JSONDecodeError, ValueError):
+            continue
+    # Deduplicate while preserving order
+    seen = set()
+    unique = []
+    for url in images:
+        if url not in seen:
+            seen.add(url)
+            unique.append(url)
+    return unique
+
+
 def _load_agent_config():
     """Load user config natively via Hermes' own config loader.
 
@@ -194,12 +238,15 @@ async def chat_endpoint(request: Request):
                 conversation_history=conversation_history,
                 stream_callback=stream_callback,
             )
+            # Extract any generated image URLs from tool results in the conversation
+            images = _extract_images_from_messages(result.get("messages", []))
             loop.call_soon_threadsafe(
                 queue.put_nowait,
                 {
                     "type": "done",
                     "result": result.get("final_response", ""),
                     "session_id": getattr(agent, "session_id", resolved_session_id),
+                    "images": images,
                 },
             )
         except Exception as exc:
