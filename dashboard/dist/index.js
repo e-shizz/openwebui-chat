@@ -436,7 +436,7 @@
         /* Sidebar header */
         React.createElement(
           "div",
-          { className: "p-3 border-b border-border/40 flex-shrink-0 flex flex-col gap-2 min-w-[18rem]" },
+          { className: "p-3 border-b border-border/40 flex-shrink-0 flex flex-col gap-2 w-full overflow-hidden" },
           /* Row: toggle + new chat */
           React.createElement(
             "div",
@@ -483,7 +483,7 @@
         /* Session list */
         React.createElement(
           "div",
-          { className: "flex-1 overflow-y-auto min-h-0 min-w-[18rem]" },
+          { className: "flex-1 overflow-y-auto min-h-0 w-full overflow-hidden" },
           sessions.length === 0 &&
             React.createElement(
               "div",
