@@ -248,6 +248,19 @@
     const messagesEndRef = useRef(null);
     const inputRef = useRef(null);
 
+    /* Handle ?resume=<session_id> from URL (like /chat?resume=...) */
+    useEffect(() => {
+      const params = new URLSearchParams(window.location.search);
+      const resumeId = params.get("resume");
+      if (resumeId) {
+        setActiveSessionId(resumeId);
+        // Clean the URL so a refresh doesn't re-trigger
+        const url = new URL(window.location.href);
+        url.searchParams.delete("resume");
+        window.history.replaceState({}, "", url.toString());
+      }
+    }, []);
+
     /* Load session list */
     const refreshSessions = useCallback(() => {
       api
@@ -528,16 +541,14 @@
     return React.createElement(
       "div",
       {
-        className: "flex flex-row w-full overflow-hidden normal-case",
-        style: { minHeight: "calc(100dvh - 100px)" },
+        className: "flex flex-row w-full h-full overflow-hidden normal-case",
       },
 
       /* Sidebar — always visible, solid, part of layout */
       React.createElement(
         "div",
         {
-          className: "flex flex-col w-72 flex-shrink-0 bg-background border-r border-border",
-          style: { height: "calc(100dvh - 100px)" },
+          className: "flex flex-col w-72 flex-shrink-0 bg-background border-r border-border h-full",
         },
         renderSidebarContent()
       ),
