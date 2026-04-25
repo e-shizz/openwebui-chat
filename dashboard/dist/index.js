@@ -186,7 +186,7 @@
         "button",
         {
           onClick: (e) => { e.stopPropagation(); onDelete(); },
-          className: "absolute top-1 right-2 opacity-0 group-hover:opacity-100 transition-opacity duration-150 p-1 rounded hover:bg-destructive/20 text-muted-foreground hover:text-destructive cursor-pointer",
+          className: "absolute top-0 right-2 opacity-0 group-hover:opacity-100 transition-opacity duration-150 p-1 rounded hover:bg-destructive/20 text-muted-foreground hover:text-destructive cursor-pointer",
           title: "Delete session",
         },
         React.createElement(
