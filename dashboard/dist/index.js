@@ -232,8 +232,17 @@
     });
 
     // Render generated images from tool calls (passed as prop) after text content
-    if (images && images.length > 0) {
-      images.forEach((url, idx) => {
+    // BUT deduplicate against markdown images already rendered inline
+    const markdownImageUrls = new Set();
+    const mdImgRegex = /!\[([^\]]*)\]\(([^)]+)\)/g;
+    let mdMatch;
+    while ((mdMatch = mdImgRegex.exec(content)) !== null) {
+      markdownImageUrls.add(mdMatch[2]);
+    }
+    const dedupedImages = (images || []).filter((u) => !markdownImageUrls.has(u));
+
+    if (dedupedImages.length > 0) {
+      dedupedImages.forEach((url, idx) => {
         children.push(
           React.createElement(
             "div",
