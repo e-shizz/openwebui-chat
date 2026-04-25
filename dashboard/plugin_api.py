@@ -33,66 +33,48 @@ if _HERMES_ROOT and str(_HERMES_ROOT) not in sys.path:
 
 
 def _load_agent_config():
-    """Load user config + .env exactly like the CLI does.
+    """Load user config natively via Hermes' own config loader.
 
-    Provider-aware API key selection: picks the key that matches the
-    resolved provider instead of the first key found in the .env file.
+    Reads ~/.hermes/config.yaml exactly like the CLI does, then resolves
+    the API key from the environment using the provider name itself.
+    No hardcoded priority chains, no stale static catalogs.
     """
     from hermes_cli.config import load_config, load_env
 
     cfg = load_config()
     env = load_env()
 
-    model = cfg.get("model", "")
-    if isinstance(model, dict):
-        model_name = model.get("default", model.get("name", ""))
-        model_provider = model.get("provider", "")
-        model_base_url = model.get("base_url", "")
+    model_cfg = cfg.get("model", {})
+    if isinstance(model_cfg, dict):
+        model_name = model_cfg.get("default", model_cfg.get("name", ""))
+        provider = model_cfg.get("provider", "")
+        base_url = model_cfg.get("base_url", "")
+        api_mode = model_cfg.get("api_mode", "chat_completions")
     else:
-        model_name = str(model) if model else ""
-        model_provider = ""
-        model_base_url = ""
+        model_name = str(model_cfg) if model_cfg else ""
+        provider = ""
+        base_url = ""
+        api_mode = "chat_completions"
 
-    provider = cfg.get("provider") or model_provider
-    api_mode = cfg.get("api_mode") or (model.get("api_mode") if isinstance(model, dict) else None)
-    base_url = cfg.get("base_url") or model_base_url or env.get("OPENAI_BASE_URL")
-    max_iterations = cfg.get("max_iterations", 90)
+    max_iterations = cfg.get("agent", {}).get("max_turns", 90)
     if not isinstance(max_iterations, int):
         max_iterations = 90
 
-    # Provider-aware API key selection
-    _PROVIDER_KEY_MAP = {
-        "openai": "OPENAI_API_KEY",
-        "anthropic": "ANTHROPIC_API_KEY",
-        "xai": "XAI_API_KEY",
-        "gemini": "GEMINI_API_KEY",
-        "nous": "NOUS_API_KEY",
-        "opencode-go": "OPENCODE_GO_API_KEY",
-        "openrouter": "OPENROUTER_API_KEY",
-        "deepseek": "DEEPSEEK_API_KEY",
-    }
-
+    # Compute the expected env var name from the provider itself.
+    #   opencode-go  → OPENCODE_GO_API_KEY
+    #   openai       → OPENAI_API_KEY
+    #   gemini       → GEMINI_API_KEY
     api_key = None
     if provider:
-        # Normalize provider name for lookup
-        normalized = provider.lower().replace("_", "-")
-        env_key = _PROVIDER_KEY_MAP.get(normalized)
-        if env_key:
-            api_key = env.get(env_key)
+        env_key = provider.upper().replace("-", "_") + "_API_KEY"
+        api_key = env.get(env_key)
 
-    # Fallback: generic keys in priority order (only if provider-specific not found)
+    # Fallback: scan env for any *_API_KEY that might match (useful for custom providers)
     if not api_key:
-        api_key = (
-            env.get("OPENAI_API_KEY")
-            or env.get("ANTHROPIC_API_KEY")
-            or env.get("XAI_API_KEY")
-            or env.get("GEMINI_API_KEY")
-            or env.get("NOUS_API_KEY")
-            or env.get("OPENCODE_GO_API_KEY")
-            or env.get("OPENROUTER_API_KEY")
-            or env.get("DEEPSEEK_API_KEY")
-            or cfg.get("api_key")
-        )
+        for key, value in env.items():
+            if key.endswith("_API_KEY") and value:
+                api_key = value
+                break
 
     return {
         "model": model_name,
@@ -108,67 +90,37 @@ def _load_agent_config():
 async def models_endpoint():
     """Return available models for the configured provider.
 
-    Tries live API first (using the provider's /models endpoint),
-    falls back to static curated catalog if unreachable.
-    Always includes the currently configured model.
+    Tries live API first (using the exact base_url/api_key from config),
+    falls back to only the currently configured model.
     """
     config = _load_agent_config()
-    provider = config.get("provider") or ""
     base_url = config.get("base_url")
     api_key = config.get("api_key")
-    api_mode = config.get("api_mode")
     current_model = config.get("model", "")
 
     models = []
-    source = "static"
+    source = "config"
 
-    # 1. Try live API probe first (works for most OpenAI-compatible providers)
-    if base_url:
+    # Try live API probe using the exact config values
+    if base_url and api_key:
         try:
             from hermes_cli.models import probe_api_models
-            result = probe_api_models(api_key, base_url, timeout=5.0, api_mode=api_mode)
+            result = probe_api_models(api_key, base_url, timeout=5.0)
             live_models = result.get("models")
             if live_models:
-                models = list(live_models)
+                models = sorted(set(str(m) for m in live_models if m))
                 source = "live"
         except Exception:
             pass
 
-    # 2. Provider-specific live fetches for providers that don't use base_url
-    if not models and provider:
-        try:
-            from hermes_cli.models import (
-                normalize_provider,
-                _fetch_anthropic_models,
-                _fetch_ai_gateway_models,
-                _PROVIDER_MODELS,
-            )
-            normalized = normalize_provider(provider)
-
-            if normalized == "anthropic":
-                live = _fetch_anthropic_models()
-                if live:
-                    models = live
-                    source = "live"
-            elif normalized == "ai-gateway":
-                live = _fetch_ai_gateway_models()
-                if live:
-                    models = live
-                    source = "live"
-            elif normalized in _PROVIDER_MODELS:
-                models = list(_PROVIDER_MODELS[normalized])
-                source = "static"
-        except Exception:
-            pass
-
-    # 3. Ensure current model is always included
-    if current_model and current_model not in models:
-        models.insert(0, current_model)
+    # Fallback: only the configured model (never a stale static catalog)
+    if not models and current_model:
+        models = [current_model]
 
     return {
         "models": models,
         "source": source,
-        "provider": provider,
+        "provider": config.get("provider", ""),
         "current_model": current_model,
     }
 
