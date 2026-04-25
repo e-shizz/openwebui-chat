@@ -146,20 +146,20 @@
   }
 
   /* ── SessionItem ─────────────────────────────────────────────── */
-  function SessionItem({ session, isActive, onClick }) {
+  function SessionItem({ session, isActive, onClick, onDelete }) {
     return React.createElement(
       "div",
       {
         onClick: onClick,
         className: cn(
-          "cursor-pointer px-3 py-2.5 border-b border-border/40 transition-colors select-none",
+          "cursor-pointer px-3 py-2.5 border-b border-border/40 transition-colors select-none group relative",
           "hover:bg-accent/60",
           isActive && "bg-accent"
         ),
       },
       React.createElement(
         "div",
-        { className: "font-medium text-sm truncate leading-tight" },
+        { className: "font-medium text-sm truncate leading-tight pr-6" },
         session.title || session.preview || "Untitled chat"
       ),
       React.createElement(
@@ -181,6 +181,20 @@
             className: "w-1.5 h-1.5 rounded-full bg-green-500 inline-block",
             title: "Active",
           })
+      ),
+      React.createElement(
+        "button",
+        {
+          onClick: (e) => { e.stopPropagation(); onDelete(); },
+          className: "absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity duration-150 p-1 rounded hover:bg-destructive/20 text-muted-foreground hover:text-destructive cursor-pointer",
+          title: "Delete session",
+        },
+        React.createElement(
+          "svg",
+          { width: 14, height: 14, viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: 2, strokeLinecap: "round", strokeLinejoin: "round" },
+          React.createElement("polyline", { points: "3 6 5 6 21 6" }),
+          React.createElement("path", { d: "M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" })
+        )
       )
     );
   }
@@ -324,6 +338,21 @@
       setStreamingContent("");
       setError(null);
     }, []);
+
+    const handleDeleteSession = useCallback((id) => {
+      api
+        .deleteSession(id)
+        .then(() => {
+          if (id === activeSessionId) {
+            handleNewChat();
+          }
+          refreshSessions();
+        })
+        .catch((err) => {
+          console.error("Failed to delete session:", err);
+          setError("Could not delete session.");
+        });
+    }, [activeSessionId, handleNewChat, refreshSessions]);
 
     const handleSend = useCallback(async () => {
       const text = inputValue.trim();
@@ -500,6 +529,7 @@
               session: s,
               isActive: s.id === activeSessionId,
               onClick: () => handleSelectSession(s.id),
+              onDelete: () => handleDeleteSession(s.id),
             })
           )
         )
