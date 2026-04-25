@@ -593,7 +593,7 @@
           { className: "flex-shrink-0 border-t border-border p-3 md:p-4" },
           React.createElement(
             "div",
-            { className: "flex gap-2 items-end max-w-3xl mx-auto" },
+            { className: "flex gap-2 items-end" },
             React.createElement(Input, {
               ref: inputRef,
               value: inputValue,
