@@ -1,5 +1,7 @@
 # Hermes WebUI Chat
 
+> 🚨 **POST-CONTEST DEVELOPMENT BRANCH** — The [contest submission is preserved here](https://github.com/e-shizz/hermes-webui-chat/tree/contest-submission). This branch (`main`) is actively maintained with bugfixes and new features, and will become the default branch once the judging period concludes. All contest honors intact~! 🏆
+
 A native web chat plugin for [Hermes Agent](https://github.com/NousResearch/hermes-agent) that brings clean, streaming chat directly into the dashboard. No terminal. No xterm.js. Just fast, native React chat.
 
 Built for the **Nous Research Dashboard Hackathon** (2026-04-25) — Plugin Track.

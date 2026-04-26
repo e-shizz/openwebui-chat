@@ -15,6 +15,222 @@ if (!window.hljs) {
   document.head.appendChild(script);
 }
 
+/* ── Import marked for Markdown rendering ──────────────────────── */
+import { marked } from "marked";
+
+/* ── Markdown inline renderer ──────────────────────────────────── */
+function renderInline(tokens, keyPrefix) {
+  if (!tokens || !tokens.length) return [];
+  return tokens.map((tok, i) => {
+    const key = `${keyPrefix}-i${i}`;
+    switch (tok.type) {
+      case "text":
+      case "raw":
+      case "escape":
+        return <span key={key}>{tok.text || tok.raw}</span>;
+      case "strong":
+        return (
+          <strong key={key} className="font-semibold text-foreground">
+            {renderInline(tok.tokens, `${keyPrefix}-${i}`)}
+          </strong>
+        );
+      case "em":
+        return (
+          <em key={key} className="italic text-foreground">
+            {renderInline(tok.tokens, `${keyPrefix}-${i}`)}
+          </em>
+        );
+      case "codespan":
+        return (
+          <code
+            key={key}
+            className="px-1.5 py-0.5 rounded bg-muted/80 text-foreground font-mono text-[11px] border border-border/30"
+          >
+            {tok.text}
+          </code>
+        );
+      case "link":
+        return (
+          <a
+            key={key}
+            href={tok.href}
+            title={tok.title || ""}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-primary hover:underline decoration-primary/50"
+          >
+            {renderInline(tok.tokens, `${keyPrefix}-${i}`)}
+          </a>
+        );
+      case "image":
+        return (
+          <div key={key} className="my-2 rounded-lg overflow-hidden border border-border/30 shadow-sm">
+            <img
+              src={tok.href}
+              alt={tok.text || "Image"}
+              className="max-w-full h-auto block"
+              loading="lazy"
+              onError={(e) => { e.target.style.display = "none"; }}
+            />
+          </div>
+        );
+      case "del":
+        return (
+          <del key={key} className="text-muted-foreground">
+            {renderInline(tok.tokens, `${keyPrefix}-${i}`)}
+          </del>
+        );
+      case "br":
+        return <br key={key} />;
+      case "html":
+        return <span key={key} dangerouslySetInnerHTML={{ __html: tok.raw }} />;
+      default:
+        return <span key={key}>{tok.text || tok.raw}</span>;
+    }
+  });
+}
+
+/* ── Markdown block renderer ───────────────────────────────────── */
+function renderBlocks(tokens, keyPrefix, fontSize) {
+  if (!tokens || !tokens.length) return null;
+  return tokens.map((tok, i) => {
+    const key = `${keyPrefix}-b${i}`;
+    switch (tok.type) {
+      case "heading": {
+        const headingClasses = {
+          1: "text-2xl font-bold mt-4 mb-2",
+          2: "text-xl font-semibold mt-3 mb-2",
+          3: "text-lg font-semibold mt-3 mb-1.5",
+          4: "text-base font-medium mt-2 mb-1",
+          5: "text-sm font-medium mt-2 mb-1",
+          6: "text-xs font-medium mt-2 mb-1 text-muted-foreground",
+        };
+        return (
+          <div key={key} className={headingClasses[tok.depth] || headingClasses[3]}>
+            {renderInline(tok.tokens, `${keyPrefix}-${i}`)}
+          </div>
+        );
+      }
+      case "paragraph":
+        return (
+          <p key={key} className="my-1.5 text-foreground leading-relaxed">
+            {renderInline(tok.tokens, `${keyPrefix}-${i}`)}
+          </p>
+        );
+      case "text":
+        return (
+          <p key={key} className="my-1 text-foreground">
+            {renderInline(tok.tokens, `${keyPrefix}-${i}`)}
+          </p>
+        );
+      case "code":
+        return <CodeBlock key={key} code={tok.text} lang={tok.lang || ""} fontSize={fontSize} />;
+      case "blockquote":
+        return (
+          <blockquote
+            key={key}
+            className="border-l-2 border-primary/40 pl-3 my-2 italic text-muted-foreground"
+          >
+            {renderInline(tok.tokens, `${keyPrefix}-${i}`)}
+          </blockquote>
+        );
+      case "list": {
+        const ListTag = tok.ordered ? "ol" : "ul";
+        return (
+          <ListTag
+            key={key}
+            className={
+              tok.ordered
+                ? "list-decimal pl-5 my-2 space-y-0.5"
+                : "list-disc pl-5 my-2 space-y-0.5"
+            }
+          >
+            {tok.items.map((item, j) => {
+              const itemKey = `${key}-li${j}`;
+              const itemTokens = item.tokens || [];
+              const inlineTokens = itemTokens.filter((t) => t.type !== "list");
+              const nestedLists = itemTokens.filter((t) => t.type === "list");
+              return (
+                <li key={itemKey} className="text-foreground leading-relaxed">
+                  {renderInline(inlineTokens, `${keyPrefix}-${i}-${j}`)}
+                  {item.task && (
+                    <span className="ml-1 text-muted-foreground text-xs">
+                      [{item.checked ? "x" : " "}]
+                    </span>
+                  )}
+                  {nestedLists.length > 0 &&
+                    renderBlocks(nestedLists, `${keyPrefix}-${i}-${j}`, fontSize)}
+                </li>
+              );
+            })}
+          </ListTag>
+        );
+      }
+      case "table": {
+        const aligns = tok.align || [];
+        return (
+          <div key={key} className="my-3 overflow-x-auto">
+            <table className="w-full text-sm border-collapse border border-border/40 rounded-md">
+              <thead>
+                <tr className="bg-muted/50">
+                  {tok.header.map((cell, j) => (
+                    <th
+                      key={`${key}-th${j}`}
+                      className={cn(
+                        "px-3 py-2 text-left text-xs font-semibold text-foreground border-b border-border/40",
+                        aligns[j] === "center" && "text-center",
+                        aligns[j] === "right" && "text-right"
+                      )}
+                    >
+                      {renderInline(cell.tokens, `${keyPrefix}-${i}-h${j}`)}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {tok.rows.map((row, r) => (
+                  <tr
+                    key={`${key}-tr${r}`}
+                    className="border-b border-border/20 last:border-b-0 hover:bg-accent/20"
+                  >
+                    {row.map((cell, j) => (
+                      <td
+                        key={`${key}-td${r}-${j}`}
+                        className={cn(
+                          "px-3 py-2 text-foreground",
+                          aligns[j] === "center" && "text-center",
+                          aligns[j] === "right" && "text-right"
+                        )}
+                      >
+                        {renderInline(cell.tokens, `${keyPrefix}-${i}-r${r}c${j}`)}
+                      </td>
+                    ))}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        );
+      }
+      case "hr":
+        return <hr key={key} className="my-3 border-border/40" />;
+      case "space":
+        return null;
+      case "html":
+        return <div key={key} dangerouslySetInnerHTML={{ __html: tok.text }} />;
+      default:
+        return <p key={key} className="text-foreground">{tok.text}</p>;
+    }
+  });
+}
+
+/* ── MarkdownContent component ─────────────────────────────────── */
+function MarkdownContent({ text, fontSize }) {
+  if (!text) return null;
+  const tokens = marked.lexer(text, { gfm: true, breaks: false });
+  return <div className="markdown-content">{renderBlocks(tokens, "md", fontSize)}</div>;
+}
+
 /* ── Helpers ───────────────────────────────────────────────────── */
 function genId() {
   return "f_" + Math.random().toString(36).slice(2, 9);
@@ -150,63 +366,7 @@ function ChatBubble({ role, content, isStreaming, fontSize, images }) {
     );
   }
 
-  function parseSegments(text) {
-    if (!text) return [{ type: "text", content: "" }];
-    const rawSegments = [];
-    const codeRegex = /```(\w*)\n?([\s\S]*?)```/g;
-    let lastIndex = 0;
-    let match;
-    while ((match = codeRegex.exec(text)) !== null) {
-      if (match.index > lastIndex) {
-        rawSegments.push({ type: "text", content: text.slice(lastIndex, match.index) });
-      }
-      rawSegments.push({ type: "code", lang: match[1], content: match[2] });
-      lastIndex = codeRegex.lastIndex;
-    }
-    if (lastIndex < text.length) {
-      rawSegments.push({ type: "text", content: text.slice(lastIndex) });
-    }
-    const segments = [];
-    const imgRegex = /!\[([^\]]*)\]\(([^)]+)\)/g;
-    for (const seg of rawSegments) {
-      if (seg.type !== "text") {
-        segments.push(seg);
-        continue;
-      }
-      let imgLast = 0;
-      let imgMatch;
-      while ((imgMatch = imgRegex.exec(seg.content)) !== null) {
-        if (imgMatch.index > imgLast) {
-          segments.push({ type: "text", content: seg.content.slice(imgLast, imgMatch.index) });
-        }
-        segments.push({ type: "image", alt: imgMatch[1], url: imgMatch[2] });
-        imgLast = imgRegex.lastIndex;
-      }
-      if (imgLast < seg.content.length) {
-        segments.push({ type: "text", content: seg.content.slice(imgLast) });
-      }
-    }
-    return segments.length ? segments : [{ type: "text", content: text }];
-  }
-
-  const segments = parseSegments(content);
-  const children = segments.map((seg, i) => {
-    if (seg.type === "text") {
-      return <div key={i} className="whitespace-pre-wrap break-words text-foreground py-1" style={textStyle}>{seg.content}</div>;
-    }
-    if (seg.type === "code") {
-      return <CodeBlock key={i} code={seg.content} lang={seg.lang} fontSize={fontSize} />;
-    }
-    if (seg.type === "image") {
-      return (
-        <div key={i} className="my-2 rounded-lg overflow-hidden border border-border/30 shadow-sm">
-          <img src={seg.url} alt={seg.alt || "Image"} className="max-w-full h-auto block" loading="lazy" onError={(e) => { e.target.style.display = "none"; }} />
-        </div>
-      );
-    }
-    return null;
-  });
-
+  // Extract markdown image URLs to deduplicate against tool-generated images
   const markdownImageUrls = new Set();
   const mdImgRegex = /!\[([^\]]*)\]\(([^)]+)\)/g;
   let mdMatch;
@@ -215,24 +375,28 @@ function ChatBubble({ role, content, isStreaming, fontSize, images }) {
   }
   const dedupedImages = (images || []).filter((u) => !markdownImageUrls.has(u));
 
-  if (dedupedImages.length > 0) {
-    dedupedImages.forEach((url, idx) => {
-      children.push(
-        <div key={`toolimg-${idx}`} className="my-2 rounded-lg overflow-hidden border border-border/30 shadow-sm">
-          <img src={url} alt="Generated image" className="max-w-full h-auto block" loading="lazy" onError={(e) => { e.target.style.display = "none"; }} />
-        </div>
-      );
-    });
-  }
-
-  if (isStreaming) {
-    children.push(<span key="stream" className="inline-block w-1.5 h-4 ml-1 bg-current align-middle animate-pulse rounded-sm" />);
-  }
-
   return (
     <div className="flex w-full mb-3 justify-start group">
       <div className="max-w-[85%] text-sm leading-relaxed">
-        {children}
+        <MarkdownContent text={content} fontSize={fontSize} />
+        {dedupedImages.length > 0 &&
+          dedupedImages.map((url, idx) => (
+            <div
+              key={`toolimg-${idx}`}
+              className="my-2 rounded-lg overflow-hidden border border-border/30 shadow-sm"
+            >
+              <img
+                src={url}
+                alt="Generated image"
+                className="max-w-full h-auto block"
+                loading="lazy"
+                onError={(e) => { e.target.style.display = "none"; }}
+              />
+            </div>
+          ))}
+        {isStreaming && (
+          <span className="inline-block w-1.5 h-4 ml-1 bg-current align-middle animate-pulse rounded-sm" />
+        )}
         {!isStreaming && (
           <div className="flex items-center gap-2 mt-1 opacity-0 group-hover:opacity-100 transition-opacity duration-150">
             <button
