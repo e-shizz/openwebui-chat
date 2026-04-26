@@ -27,7 +27,7 @@ This plugin adds a "Web Chat" tab to the Hermes dashboard with a native chat int
 |:---:|:---:|
 | ![Clean design](screenshots/clean%20design.png) | ![Session sidebar and model selector](screenshots/session%20side%20barr%20changes%20and%20deletes%20sessions%20%2C%20changes%20models%20from%20provider.png) |
 
-|| Hermes skills, images & TTS | Firefox sidebar ready |
+| Hermes skills, images & TTS | Firefox sidebar ready |
 |:---:|:---:|
 | ![Skills images and TTS](screenshots/able%20to%20use%20hermes%20skills%2C%20show%20images%20hermes%20creates%20and%20use%20tts.png) | ![Firefox extension](screenshots/can%20be%20run%20in%20browser%20extensions%20for%20firefox.png) |
 
