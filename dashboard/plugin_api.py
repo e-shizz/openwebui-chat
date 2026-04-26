@@ -91,13 +91,20 @@ def _load_agent_config():
     """Load user config natively via Hermes' own config loader.
 
     Reads ~/.hermes/config.yaml exactly like the CLI does, then resolves
-    the API key from the environment using the provider name itself.
-    No hardcoded priority chains, no stale static catalogs.
+    credentials through Hermes' native auth registry — supporting every
+    provider's exact env-var chain, base_url heuristics, and OAuth state.
     """
-    from hermes_cli.config import load_config, load_env
+    import os
+
+    from hermes_cli.config import load_config
+    from hermes_cli.auth import (
+        resolve_api_key_provider_credentials,
+        PROVIDER_REGISTRY,
+        AuthError,
+    )
+    from hermes_cli.models import normalize_provider
 
     cfg = load_config()
-    env = load_env()
 
     model_cfg = cfg.get("model", {})
     if isinstance(model_cfg, dict):
@@ -115,21 +122,29 @@ def _load_agent_config():
     if not isinstance(max_iterations, int):
         max_iterations = 90
 
-    # Compute the expected env var name from the provider itself.
-    #   opencode-go  → OPENCODE_GO_API_KEY
-    #   openai       → OPENAI_API_KEY
-    #   gemini       → GEMINI_API_KEY
+    # Use Hermes' native auth resolver for API-key providers.
+    # This handles multi-env-var chains (e.g. GOOGLE_API_KEY + GEMINI_API_KEY),
+    # provider-specific base_url logic (Kimi redirect, Z.AI resolution), etc.
     api_key = None
-    if provider:
-        env_key = provider.upper().replace("-", "_") + "_API_KEY"
-        api_key = env.get(env_key)
+    normalized = normalize_provider(provider) if provider else ""
 
-    # Fallback: scan env for any *_API_KEY that might match (useful for custom providers)
-    if not api_key:
-        for key, value in env.items():
-            if key.endswith("_API_KEY") and value:
-                api_key = value
-                break
+    if normalized and normalized in PROVIDER_REGISTRY:
+        pconfig = PROVIDER_REGISTRY[normalized]
+        if pconfig.auth_type == "api_key":
+            try:
+                creds = resolve_api_key_provider_credentials(normalized)
+                api_key = creds.get("api_key") or None
+                if not base_url:
+                    base_url = creds.get("base_url", "")
+            except AuthError:
+                api_key = None
+        # OAuth / external_process / AWS providers: we cannot auto-resolve a
+        # key, but the model list will still populate from curated_models.
+    else:
+        # Custom provider — fall back to naive env scan as last resort
+        if provider:
+            env_key = provider.upper().replace("-", "_") + "_API_KEY"
+            api_key = os.environ.get(env_key) or os.environ.get("API_KEY") or None
 
     return {
         "model": model_name,
@@ -145,8 +160,11 @@ def _load_agent_config():
 async def models_endpoint():
     """Return available models for the configured provider.
 
-    Tries live API first (using the provider's /models endpoint),
-    falls back to Hermes' static curated catalog if unreachable.
+    Uses Hermes' native ``curated_models_for_provider`` which handles:
+      • Live API probing for OpenAI-compatible endpoints
+      • OpenRouter dynamic catalog fetching
+      • Static curated catalog fallback
+      • Custom provider live probing when a base_url is set
     Always includes the currently configured model.
     """
     config = _load_agent_config()
@@ -159,28 +177,35 @@ async def models_endpoint():
     models = []
     source = "static"
 
-    # 1. Try live API probe first (works for most OpenAI-compatible providers)
-    if base_url:
+    if provider:
+        from hermes_cli.models import (
+            curated_models_for_provider,
+            normalize_provider,
+            probe_api_models,
+        )
+        from hermes_cli.auth import PROVIDER_REGISTRY
+
+        normalized = normalize_provider(provider)
+
+        # 1. Hermes' native model discovery (live + static + OpenRouter)
         try:
-            from hermes_cli.models import probe_api_models
-            result = probe_api_models(api_key, base_url, timeout=5.0, api_mode=api_mode)
-            live_models = result.get("models")
-            if live_models:
-                models = sorted(set(str(m) for m in live_models if m))
+            model_tuples = curated_models_for_provider(normalized)
+            if model_tuples:
+                models = sorted(set(str(m[0]) for m in model_tuples if m[0]))
                 source = "live"
         except Exception:
             pass
 
-    # 2. Fall back to Hermes' built-in provider catalog (agnostic — works for all providers)
-    if not models and provider:
-        try:
-            from hermes_cli.models import normalize_provider, _PROVIDER_MODELS
-            normalized = normalize_provider(provider)
-            if normalized in _PROVIDER_MODELS:
-                models = list(_PROVIDER_MODELS[normalized])
-                source = "static"
-        except Exception:
-            pass
+        # 2. Custom provider with base_url — probe directly
+        if not models and base_url and normalized not in PROVIDER_REGISTRY:
+            try:
+                result = probe_api_models(api_key, base_url, timeout=5.0, api_mode=api_mode)
+                live_models = result.get("models")
+                if live_models:
+                    models = sorted(set(str(m) for m in live_models if m))
+                    source = "live"
+            except Exception:
+                pass
 
     # 3. Ensure current model is always included
     if current_model and current_model not in models:
