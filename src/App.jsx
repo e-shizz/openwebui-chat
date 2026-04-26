@@ -435,6 +435,13 @@ function WebUIChat() {
   const [isLoading, setIsLoading] = useState(false);
   const [streamingContent, setStreamingContent] = useState("");
   const [error, setError] = useState(null);
+  const [messageQueue, setMessageQueue] = useState([]);
+  const abortControllerRef = useRef(null);
+  const currentRequestIdRef = useRef(null);
+  const streamingContentRef = useRef("");
+  const isLoadingRef = useRef(false);
+  const activeSessionIdRef = useRef(null);
+  const currentStreamSessionIdRef = useRef(null);
   const [fontSize, setFontSize] = useState(() => {
     try { return parseInt(localStorage.getItem("hermes-chat-font-size"), 10) || 14; } catch { return 14; }
   });
@@ -563,6 +570,11 @@ function WebUIChat() {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
   }, [messages, streamingContent]);
 
+  /* Keep refs in sync with state for instant reads from callbacks */
+  useEffect(() => { isLoadingRef.current = isLoading; }, [isLoading]);
+  useEffect(() => { streamingContentRef.current = streamingContent; }, [streamingContent]);
+  useEffect(() => { activeSessionIdRef.current = activeSessionId; }, [activeSessionId]);
+
   /* Focus input */
   useEffect(() => { inputRef.current?.focus(); }, [activeSessionId]);
 
@@ -572,10 +584,21 @@ function WebUIChat() {
 
   /* Actions */
   const handleNewChat = useCallback(() => {
+    /* Abort any cross-session stream before clearing state */
+    if (isLoadingRef.current && currentStreamSessionIdRef.current && currentStreamSessionIdRef.current !== activeSessionIdRef.current) {
+      abortControllerRef.current?.abort();
+    }
     setActiveSessionId(null); setMessages([]); setInputValue(""); setStreamingContent(""); setError(null); setCurrentPage(0);
   }, []);
 
   const handleSelectSession = useCallback((id) => {
+    /* If there's an active stream for a different session, abort it so it
+       doesn't leak updates into the new session we're switching to. */
+    if (isLoadingRef.current && currentStreamSessionIdRef.current && currentStreamSessionIdRef.current !== id) {
+      abortControllerRef.current?.abort();
+      // Do NOT append partials here - they belong to the old session and
+      // would pollute the new one. The backend has already persisted messages.
+    }
     setActiveSessionId(id); setStreamingContent(""); setError(null);
   }, []);
 
@@ -593,15 +616,42 @@ function WebUIChat() {
     }).catch((err) => { console.error("Failed to delete session:", err); setError("Could not delete session."); });
   }, [activeSessionId, handleNewChat, refreshSessions, sessions.length, currentPage]);
 
-  const handleSend = useCallback(async () => {
-    const text = inputValue.trim();
-    if (!text || isLoading) return;
-    setInputValue(""); setIsLoading(true); setStreamingContent(""); setError(null);
+  const handleSend = useCallback(async (explicitText) => {
+    const text = (explicitText !== undefined ? explicitText : inputValue).trim();
+    if (!text) return;
+
+    /* If a turn is already running, queue this message for auto-send */
+    if (isLoadingRef.current && explicitText === undefined) {
+      setMessageQueue((prev) => [...prev, text]);
+      setInputValue("");
+      return;
+    }
+
+    setInputValue("");
+    setIsLoading(true);
+    setStreamingContent("");
+    streamingContentRef.current = "";
+    setError(null);
     setMessages((prev) => [...prev, { role: "user", content: text }]);
+
+    const requestId = "req_" + Math.random().toString(36).slice(2, 11);
+    currentRequestIdRef.current = requestId;
+    const startedSessionId = activeSessionId;
+    currentStreamSessionIdRef.current = startedSessionId;
+    const abortController = new AbortController();
+    abortControllerRef.current = abortController;
+
     try {
       const res = await fetch("/api/plugins/webui/chat", {
-        method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ session_id: activeSessionId, message: text, model: selectedModel || undefined }),
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        signal: abortController.signal,
+        body: JSON.stringify({
+          session_id: activeSessionId,
+          message: text,
+          model: selectedModel || undefined,
+          request_id: requestId,
+        }),
       });
       if (!res.ok) { const body = await res.text().catch(() => res.statusText); throw new Error(`${res.status}: ${body}`); }
       const reader = res.body.getReader();
@@ -621,34 +671,96 @@ function WebUIChat() {
           if (!payload) continue;
           try {
             const msg = JSON.parse(payload);
-            if (msg.type === "delta") setStreamingContent((prev) => prev + (msg.content || ""));
-            else if (msg.type === "done") {
+            if (msg.type === "delta") {
+              /* Only show deltas if we're still viewing the session that
+                 started this stream; otherwise silently drop them. */
+              if (startedSessionId !== activeSessionIdRef.current) continue;
+              const delta = msg.content || "";
+              setStreamingContent((prev) => prev + delta);
+              streamingContentRef.current += delta;
+            } else if (msg.type === "done") {
               currentSessionId = msg.session_id;
               const resultText = msg.result || "";
               const mdImages = []; const imgRegex = /!\[([^\]]*)\]\(([^)]+)\)/g; let match;
               while ((match = imgRegex.exec(resultText)) !== null) { if (!mdImages.includes(match[2])) mdImages.push(match[2]); }
               const allImages = [...(msg.images || [])];
               for (const u of mdImages) if (!allImages.includes(u)) allImages.push(u);
-              setMessages((prev) => [...prev, { role: "assistant", content: resultText, images: allImages }]);
-              setStreamingContent(""); setIsLoading(false); streamDone = true; refreshSessions();
+              /* Only update messages UI if still on the originating session */
+              if (startedSessionId === activeSessionIdRef.current) {
+                setMessages((prev) => [...prev, { role: "assistant", content: resultText, images: allImages }]);
+              }
+              setStreamingContent(""); streamingContentRef.current = "";
+              setIsLoading(false); currentStreamSessionIdRef.current = null; streamDone = true; refreshSessions();
             } else if (msg.type === "error") {
-              setMessages((prev) => [...prev, { role: "assistant", content: "Error: " + (msg.message || "Unknown error") }]);
-              setStreamingContent(""); setIsLoading(false); streamDone = true;
+              if (startedSessionId === activeSessionIdRef.current) {
+                setMessages((prev) => [...prev, { role: "assistant", content: "Error: " + (msg.message || "Unknown error") }]);
+              }
+              setStreamingContent(""); streamingContentRef.current = "";
+              setIsLoading(false); currentStreamSessionIdRef.current = null; streamDone = true;
             }
           } catch {}
         }
       }
-      if (currentSessionId && currentSessionId !== activeSessionId) setActiveSessionId(currentSessionId);
+      if (currentSessionId && currentSessionId !== activeSessionId && startedSessionId === activeSessionIdRef.current) {
+        setActiveSessionId(currentSessionId);
+      }
+      /* If the stream closed without an explicit done/error, tidy up */
+      if (!streamDone) {
+        setIsLoading(false);
+        currentStreamSessionIdRef.current = null;
+      }
     } catch (err) {
+      if (err.name === "AbortError") {
+        // Stop was handled by handleStop; don't overwrite state
+        return;
+      }
       console.error(err);
-      setMessages((prev) => [...prev, { role: "assistant", content: "Error: " + err.message }]);
+      if (startedSessionId === activeSessionIdRef.current) {
+        setMessages((prev) => [...prev, { role: "assistant", content: "Error: " + err.message }]);
+      }
+      setStreamingContent(""); streamingContentRef.current = "";
       setIsLoading(false);
+      currentStreamSessionIdRef.current = null;
     }
-  }, [inputValue, isLoading, activeSessionId, selectedModel, refreshSessions]);
+  }, [inputValue, activeSessionId, selectedModel, refreshSessions]);
+
+  const handleStop = useCallback(() => {
+    const partial = streamingContentRef.current;
+    /* Only append partial to the current session's messages if the stream
+       we're stopping actually belongs to this session. */
+    if (partial && currentStreamSessionIdRef.current === activeSessionIdRef.current) {
+      setMessages((prev) => [...prev, { role: "assistant", content: partial }]);
+    }
+    setStreamingContent("");
+    streamingContentRef.current = "";
+    setIsLoading(false);
+    currentStreamSessionIdRef.current = null;
+    abortControllerRef.current?.abort();
+
+    // Tell the backend to interrupt the agent loop (fire-and-forget)
+    const requestId = currentRequestIdRef.current;
+    if (requestId) {
+      fetch("/api/plugins/webui/stop", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ request_id: requestId }),
+      }).catch(() => {});
+    }
+  }, []);
 
   const handleKeyDown = useCallback((e) => {
     if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleSend(); }
   }, [handleSend]);
+
+  /* Auto-dequeue: when a turn finishes, fire the next queued message */
+  useEffect(() => {
+    if (!isLoading && messageQueue.length > 0) {
+      const [next, ...rest] = messageQueue;
+      setMessageQueue(rest);
+      // Defer to next tick so state flush doesn't collide
+      setTimeout(() => handleSend(next), 0);
+    }
+  }, [isLoading, messageQueue, handleSend]);
 
   const hasContent = messages.length > 0 || streamingContent;
 
@@ -961,16 +1073,26 @@ function WebUIChat() {
               value={inputValue}
               onChange={(e) => { setInputValue(e.target.value); e.target.style.height = "auto"; e.target.style.height = Math.min(e.target.scrollHeight, 200) + "px"; }}
               onKeyDown={handleKeyDown}
-              placeholder="Message Hermes..."
-              disabled={isLoading}
+              placeholder={isLoading ? "Hermes is thinking..." : "Message Hermes..."}
               rows={1}
-              className="flex-1 min-h-[44px] max-h-[200px] resize-none rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+              className="flex-1 min-h-[44px] max-h-[200px] resize-none rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
               style={fontSize ? { fontSize: `${fontSize}px`, lineHeight: 1.5 } : { lineHeight: 1.5 }}
             />
-            <Button onClick={handleSend} disabled={isLoading || !inputValue.trim()} size="default">
-              {isLoading ? "…" : "Send"}
+            <Button onClick={isLoading ? handleStop : handleSend} disabled={!isLoading && !inputValue.trim()} size="default">
+              {isLoading ? (
+                <svg width={16} height={16} viewBox="0 0 24 24" fill="currentColor">
+                  <rect x={6} y={6} width={12} height={12} rx={2} />
+                </svg>
+              ) : (
+                "Send"
+              )}
             </Button>
           </div>
+          {messageQueue.length > 0 && (
+            <div className="text-[10px] text-muted-foreground text-center mt-1">
+              {messageQueue.length} message{messageQueue.length > 1 ? "s" : ""} queued
+            </div>
+          )}
           {activeSessionId && <div className="text-[10px] text-muted-foreground text-center mt-1">Session: {activeSessionId.slice(0, 20)}…</div>}
           {selectedModel && <div className="text-[10px] text-muted-foreground text-center mt-0.5">Model: {selectedModel}</div>}
         </div>

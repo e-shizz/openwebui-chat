@@ -4,6 +4,8 @@ A native web chat plugin for [Hermes Agent](https://github.com/NousResearch/herm
 
 Built for the **Nous Research Dashboard Hackathon** (2026-04-25) — Plugin Track.
 
+> ⚠️ **Branch Notice:** `main` is actively developed post-contest. For the frozen contest submission, see the [`contest-submission`](https://github.com/e-shizz/hermes-webui-chat/tree/contest-submission) branch.
+
 ---
 
 ## 🏆 Contest Submission

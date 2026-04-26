@@ -8,6 +8,7 @@ import asyncio
 import json
 import sys
 import traceback
+import uuid
 from pathlib import Path
 from typing import Optional
 
@@ -15,6 +16,10 @@ from fastapi import APIRouter, Request, HTTPException
 from fastapi.responses import StreamingResponse, FileResponse
 
 router = APIRouter()
+
+# Track active agent instances for interrupt support.
+# Key: request_id (str), Value: AIAgent instance
+active_agents: dict = {}
 
 # Ensure hermes-agent repo root is importable when this file is loaded
 # via importlib from web_server.py.
@@ -232,6 +237,7 @@ async def chat_endpoint(request: Request):
     body = await request.json()
     session_id = body.get("session_id") or None
     message = (body.get("message") or "").strip()
+    request_id = body.get("request_id") or ("req_" + str(uuid.uuid4())[:8])
 
     if not message:
         return {"error": "Message is required"}
@@ -273,6 +279,8 @@ async def chat_endpoint(request: Request):
         quiet_mode=True,
     )
 
+    active_agents[request_id] = agent
+
     loop = asyncio.get_running_loop()
     queue: asyncio.Queue = asyncio.Queue()
 
@@ -308,6 +316,8 @@ async def chat_endpoint(request: Request):
                     "detail": traceback.format_exc(),
                 },
             )
+        finally:
+            active_agents.pop(request_id, None)
 
     asyncio.create_task(asyncio.to_thread(run_chat))
 
@@ -326,6 +336,23 @@ async def chat_endpoint(request: Request):
             "X-Accel-Buffering": "no",
         },
     )
+
+
+@router.post("/stop")
+async def stop_endpoint(request: Request):
+    """Interrupt an in-progress chat by request_id.
+
+    Body: {"request_id": "..."}
+    Sets AIAgent._interrupt_requested = True so the agent loop breaks
+    and returns whatever has been streamed so far.
+    """
+    body = await request.json()
+    request_id = body.get("request_id")
+    agent = active_agents.get(request_id) if request_id else None
+    if agent and hasattr(agent, "_interrupt_requested"):
+        agent._interrupt_requested = True
+        return {"success": True}
+    return {"success": False, "error": "No active chat found"}
 
 
 @router.post("/tts")
