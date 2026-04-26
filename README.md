@@ -10,7 +10,7 @@ Built for the **Nous Research Dashboard Hackathon** (2026-04-25) — Plugin Trac
 
 **Track:** Plugin  
 **Author:** [e-shizz](https://github.com/e-shizz)  
-**Co-Author:** [mimo](https://github.com/e-shizz) (plugin SDK integration, SSE streaming backend, TTS/model selector features)  
+**Co-Author:** [kimi-k2.6](https://github.com/e-shizz) (Hermes Agent — plugin SDK integration, SSE streaming backend, TTS/model selector features)  
 **Repo:** https://github.com/e-shizz/hermes-webui-chat  
 **License:** MIT
 
