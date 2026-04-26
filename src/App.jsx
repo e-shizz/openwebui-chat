@@ -269,6 +269,22 @@ function ChatBubble({ role, content, isStreaming, fontSize, images }) {
 
   /* ── SessionItem ─────────────────────────────────────────────── */
 function SessionItem({ session, isActive, onClick, onDelete, onUnfile, draggable, onDragStart, onDragOver, onDrop, onDragEnd, isDropTarget, isInFolder }) {
+  const [mouseDownPos, setMouseDownPos] = useState(null);
+
+  const handleMouseDown = useCallback((e) => {
+    setMouseDownPos({ x: e.clientX, y: e.clientY });
+  }, []);
+
+  const handleMouseUp = useCallback((e) => {
+    if (!mouseDownPos || !onClick) return;
+    const dx = Math.abs(e.clientX - mouseDownPos.x);
+    const dy = Math.abs(e.clientY - mouseDownPos.y);
+    setMouseDownPos(null);
+    if (dx < 5 && dy < 5) {
+      onClick();
+    }
+  }, [mouseDownPos, onClick]);
+
   return (
     <div
       draggable={draggable}
@@ -276,9 +292,10 @@ function SessionItem({ session, isActive, onClick, onDelete, onUnfile, draggable
       onDragOver={onDragOver}
       onDrop={onDrop}
       onDragEnd={onDragEnd}
-      onClick={onClick}
+      onMouseDown={handleMouseDown}
+      onMouseUp={handleMouseUp}
       className={cn(
-        "cursor-pointer px-3 py-2 border-b border-border/20 first:border-t first:border-border/20 transition-colors select-none group relative",
+        "px-3 py-2 border-b border-border/20 first:border-t first:border-border/20 transition-colors select-none group relative",
         "hover:bg-accent/40",
         isActive && "bg-accent",
         isDropTarget && "bg-primary/20 ring-1 ring-primary/40",
