@@ -7,12 +7,19 @@ const { cn, timeAgo } = utils;
 /* Make React available for classic JSX transform */
 if (!window.React) window.React = React;
 
-/* ── Load highlight.js ─────────────────────────────────────────── */
+/* ── Load highlight.js + dark theme ────────────────────────────── */
 if (!window.hljs) {
   const script = document.createElement("script");
   script.src = "https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js";
   script.async = true;
   document.head.appendChild(script);
+}
+if (!document.getElementById("hljs-dark-theme")) {
+  const link = document.createElement("link");
+  link.id = "hljs-dark-theme";
+  link.rel = "stylesheet";
+  link.href = "https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/atom-one-dark.min.css";
+  document.head.appendChild(link);
 }
 
 /* ── Import marked for Markdown rendering ──────────────────────── */
@@ -377,7 +384,7 @@ function ChatBubble({ role, content, isStreaming, fontSize, images }) {
 
   return (
     <div className="flex w-full mb-3 justify-start group">
-      <div className="max-w-[85%] text-sm leading-relaxed">
+      <div className="max-w-[85%] leading-relaxed" style={textStyle}>
         <MarkdownContent text={content} fontSize={fontSize} />
         {dedupedImages.length > 0 &&
           dedupedImages.map((url, idx) => (
