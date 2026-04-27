@@ -1,23 +1,8 @@
-commit c869d4288c0986f5205e052301bb0a2a6b0614f6
-Author: e-shizz <>
-Date:   Mon Apr 27 14:43:48 2026 -0600
-
-    fix(dashboard): decouple <code> background from animated --selection-bg
-    
-    The @nous-research/ui SelectionSwitcher component cycles --selection-bg
-    through rainbow colors on every text selection and Ctrl+A. A global
-    @layer base rule applied this variable to ALL <code> elements, causing
-    inline code in every plugin (webchat, docs, etc.) to flash/change colors
-    whenever the user interacted with text.
-    
-    Override with a static background so code blocks stay readable.
-    Fixes the 'slowly changing color between catppuccin highlights' bug.
-
 diff --git a/web/src/index.css b/web/src/index.css
-index e9818174..54b39399 100644
+index e9818174..56823a79 100644
 --- a/web/src/index.css
 +++ b/web/src/index.css
-@@ -120,7 +120,16 @@ code, kbd, pre, samp, .font-mono, .font-mono-ui {
+@@ -120,7 +120,24 @@ code, kbd, pre, samp, .font-mono, .font-mono-ui {
  /* Nousnet's hermes-agent layout bumps `small` and `code` to readable
     dashboard sizes. Keep in sync. */
  small { font-size: 1.0625rem; }
@@ -26,11 +11,19 @@ index e9818174..54b39399 100644
 +/* Fix: decouple <code> background from the animated --selection-bg
 +   cycled by @nous-research/ui's SelectionSwitcher. Without this,
 +   every inline code block on the page changes color whenever the
-+   user selects text or presses Ctrl+A. */
-+code {
++   user selects text or presses Ctrl+A.
++   Scope to inline code only (not inside hljs code blocks) so
++   syntax highlighting in code fences is preserved. */
++code:not(pre.hljs code) {
 +  font-size: 0.875rem;
 +  background: var(--midground);
 +  color: var(--background);
++}
++
++/* Code blocks: transparent background so the container's glass
++   effect (bg-black/20) shows through. hljs theme colors preserved. */
++pre.hljs, pre.hljs code {
++  background: transparent !important;
 +}
  
  /* Shadcn-compat tokens.
