@@ -429,7 +429,9 @@ const CADUCEUS_ART = [
 /* ── WebUIChat (main component) ──────────────────────────────── */
 function WebUIChat() {
   const [sessions, setSessions] = useState([]);
-  const [activeSessionId, setActiveSessionId] = useState(null);
+  const [activeSessionId, setActiveSessionId] = useState(() => {
+    try { return localStorage.getItem("hermes-chat-active-session") || null; } catch { return null; }
+  });
   const [messages, setMessages] = useState([]);
   const [inputValue, setInputValue] = useState("");
   const [isLoading, setIsLoading] = useState(false);
@@ -575,6 +577,15 @@ function WebUIChat() {
   useEffect(() => { streamingContentRef.current = streamingContent; }, [streamingContent]);
   useEffect(() => { activeSessionIdRef.current = activeSessionId; }, [activeSessionId]);
 
+  /* Persist active session so it survives browser refresh */
+  useEffect(() => {
+    try {
+      if (activeSessionId) {
+        localStorage.setItem("hermes-chat-active-session", activeSessionId);
+      }
+    } catch {}
+  }, [activeSessionId]);
+
   /* Focus input */
   useEffect(() => { inputRef.current?.focus(); }, [activeSessionId]);
 
@@ -589,6 +600,7 @@ function WebUIChat() {
       abortControllerRef.current?.abort();
     }
     setActiveSessionId(null); setMessages([]); setInputValue(""); setStreamingContent(""); setError(null); setCurrentPage(0);
+    try { localStorage.removeItem("hermes-chat-active-session"); } catch {}
   }, []);
 
   const handleSelectSession = useCallback((id) => {
