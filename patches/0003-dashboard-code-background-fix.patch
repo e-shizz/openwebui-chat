@@ -1,0 +1,37 @@
+commit c869d4288c0986f5205e052301bb0a2a6b0614f6
+Author: e-shizz <>
+Date:   Mon Apr 27 14:43:48 2026 -0600
+
+    fix(dashboard): decouple <code> background from animated --selection-bg
+    
+    The @nous-research/ui SelectionSwitcher component cycles --selection-bg
+    through rainbow colors on every text selection and Ctrl+A. A global
+    @layer base rule applied this variable to ALL <code> elements, causing
+    inline code in every plugin (webchat, docs, etc.) to flash/change colors
+    whenever the user interacted with text.
+    
+    Override with a static background so code blocks stay readable.
+    Fixes the 'slowly changing color between catppuccin highlights' bug.
+
+diff --git a/web/src/index.css b/web/src/index.css
+index e9818174..54b39399 100644
+--- a/web/src/index.css
++++ b/web/src/index.css
+@@ -120,7 +120,16 @@ code, kbd, pre, samp, .font-mono, .font-mono-ui {
+ /* Nousnet's hermes-agent layout bumps `small` and `code` to readable
+    dashboard sizes. Keep in sync. */
+ small { font-size: 1.0625rem; }
+-code { font-size: 0.875rem; }
++
++/* Fix: decouple <code> background from the animated --selection-bg
++   cycled by @nous-research/ui's SelectionSwitcher. Without this,
++   every inline code block on the page changes color whenever the
++   user selects text or presses Ctrl+A. */
++code {
++  font-size: 0.875rem;
++  background: var(--midground);
++  color: var(--background);
++}
+ 
+ /* Shadcn-compat tokens.
+    The dashboard's page code predates the Nous DS and uses shadcn-style

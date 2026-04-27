@@ -1,0 +1,61 @@
+commit a70fe81db024cfd0bd9ea05c98622b546d5a685a
+Author: e-shizz <>
+Date:   Sat Apr 25 14:05:44 2026 -0600
+
+    fix(dashboard): plugin routes get proper flex context for full-height layouts
+    
+    - Detect plugin/override routes with isPluginRoute hook
+    - Skip px-3 sm:px-6 padding on plugin routes (they handle their own)
+    - Always apply min-h-0 flex flex-1 flex-col to the route container
+      instead of only for /chat and /docs routes
+    
+    This fixes dashboard plugins that use h-full for viewport-filling
+    layouts (e.g. OpenWebUI-style chat). Previously plugin routes got
+    plain w-full min-w-0 which broke flex-based height calculations.
+
+diff --git a/web/src/App.tsx b/web/src/App.tsx
+index f4285a21..d693146a 100644
+--- a/web/src/App.tsx
++++ b/web/src/App.tsx
+@@ -271,6 +271,15 @@ export default function App() {
+     () => buildRoutes(builtinRoutes, manifests),
+     [builtinRoutes, manifests],
+   );
++  const isPluginRoute = useMemo(
++    () =>
++      routes.some(
++        (r) =>
++          r.path === pathname &&
++          (r.key.startsWith("plugin:") || r.key.startsWith("override:")),
++      ),
++    [routes, pathname],
++  );
+   const pluginTabMeta = useMemo(
+     () =>
+       manifests
+@@ -496,18 +505,19 @@ export default function App() {
+             <div
+               className={cn(
+                 "relative z-2 flex min-w-0 min-h-0 flex-1 flex-col",
+-                "px-3 sm:px-6",
+-                isChatRoute
+-                  ? "pb-3 pt-1 sm:pb-4 sm:pt-2 lg:pt-4"
+-                  : "pt-2 sm:pt-4 lg:pt-6 pb-4 sm:pb-8",
++                !isPluginRoute && "px-3 sm:px-6",
++                !isPluginRoute && (
++                  isChatRoute
++                    ? "pb-3 pt-1 sm:pb-4 sm:pt-2 lg:pt-4"
++                    : "pt-2 sm:pt-4 lg:pt-6 pb-4 sm:pb-8"
++                ),
+                 isDocsRoute && "min-h-0 flex-1",
+               )}
+             >
+               <PluginSlot name="pre-main" />
+               <div
+                 className={cn(
+-                  "w-full min-w-0",
+-                  (isDocsRoute || isChatRoute) && "min-h-0 flex flex-1 flex-col",
++                  "w-full min-w-0 min-h-0 flex flex-1 flex-col",
+                 )}
+               >
+                 <Routes>

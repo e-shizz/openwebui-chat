@@ -1,0 +1,30 @@
+commit 6989b65aff9c8ac689cd88b4ec522f112b5cb866
+Author: e-shizz <>
+Date:   Mon Apr 27 08:27:49 2026 -0600
+
+    fix(dashboard): re-apply webui plugin required core patches (lost commit 3f4f6cda)
+
+diff --git a/web/src/pages/SessionsPage.tsx b/web/src/pages/SessionsPage.tsx
+index 48fbf7df..f5fb37f8 100644
+--- a/web/src/pages/SessionsPage.tsx
++++ b/web/src/pages/SessionsPage.tsx
+@@ -369,6 +369,19 @@ function SessionRow({
+               <Play className="h-3.5 w-3.5" />
+             </Button>
+           )}
++          <Button
++            variant="ghost"
++            size="icon"
++            className="h-7 w-7 text-muted-foreground hover:text-primary"
++            aria-label="Resume in Web Chat"
++            title="Resume in Web Chat"
++            onClick={(e) => {
++              e.stopPropagation();
++              navigate(`/webui?resume=${encodeURIComponent(session.id)}`);
++            }}
++          >
++            <MessageSquare className="h-3.5 w-3.5" />
++          </Button>
+           <Button
+             variant="ghost"
+             size="icon"

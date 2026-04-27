@@ -1,12 +1,10 @@
 # Hermes WebUI Chat
 
-> 🚨 **POST-CONTEST DEVELOPMENT BRANCH** — The [contest submission is preserved here](https://github.com/e-shizz/hermes-webui-chat/tree/contest-submission). This branch (`main`) is actively maintained with bugfixes and new features, and will become the default branch once the judging period concludes. All contest honors intact~! 🏆
-
 A native web chat plugin for [Hermes Agent](https://github.com/NousResearch/hermes-agent) that brings clean, streaming chat directly into the dashboard. No terminal. No xterm.js. Just fast, native React chat.
 
 Built for the **Nous Research Dashboard Hackathon** (2026-04-25) — Plugin Track.
 
-> ⚠️ **Branch Notice:** `main` is actively developed post-contest. For the frozen contest submission, see the [`contest-submission`](https://github.com/e-shizz/hermes-webui-chat/tree/contest-submission) branch.
+> 🏆 **Contest Submission:** The frozen contest submission is preserved on the [`contest-submission`](https://github.com/e-shizz/hermes-webui-chat/tree/contest-submission) branch. This `main` branch is actively maintained post-contest with bugfixes and new features.
 
 ---
 
@@ -16,10 +14,9 @@ Built for the **Nous Research Dashboard Hackathon** (2026-04-25) — Plugin Trac
 **Author:** [e-shizz](https://github.com/e-shizz)  
 **Co-Author:** [kimi-k2.6](https://github.com/e-shizz) (Hermes Agent — plugin SDK integration, SSE streaming backend, TTS/model selector features)  
 **Plugin Repo:** https://github.com/e-shizz/hermes-webui-chat  
-**Patched Hermes Fork:** https://github.com/e-shizz/hermes-agent/tree/feature/webui-chat  
 **License:** MIT
 
-> 🚨 **This plugin requires a core dashboard patch.** We opened [PR #15819](https://github.com/NousResearch/hermes-agent/pull/15819) to add flex context for plugin routes. Until it's merged, clone from our fork (branch `feature/webui-chat`) or the chat area collapses to zero height. 🚨
+> ⚠️ **This plugin requires core dashboard patches.** We opened [PR #15819](https://github.com/NousResearch/hermes-agent/pull/15819) upstream. Until merged, apply the included patch files after each `hermes upgrade`. See [Installation](#installation) below.
 
 ### What It Does
 
@@ -58,94 +55,80 @@ This plugin adds a "Web Chat" tab to the Hermes dashboard with a native chat int
 
 ## 🚀 Installation
 
-### Step 1: Use our patched Hermes (required until PR merges)
-
-```bash
-# Clone our fork with the flex fix
-git clone https://github.com/e-shizz/hermes-agent.git ~/.hermes/hermes-agent
-cd ~/.hermes/hermes-agent
-git checkout feature/webui-chat
-# ...install as normal...
-```
-
-**Why our fork?** We opened [PR #15819](https://github.com/NousResearch/hermes-agent/pull/15819) upstream to add flex context for plugin routes, but it's not merged yet. The upstream Hermes dashboard does not give plugin routes the flex treatment they need to fill the viewport. Without this, the chat area collapses to zero height.
-
-- **Upstream PR:** https://github.com/NousResearch/hermes-agent/pull/15819
-- **Our fork:** https://github.com/e-shizz/hermes-agent/tree/feature/webui-chat
-- **Commit:** [`eec701ff`](https://github.com/e-shizz/hermes-agent/commit/eec701ff) — `fix(dashboard): plugin routes get proper flex context for full-height layouts`
-
-### Step 2: Install the plugin
+### Step 1: Install the plugin
 
 ```bash
 # Clone into your Hermes plugins directory
 git clone https://github.com/e-shizz/hermes-webui-chat.git ~/.hermes/plugins/webui
+```
 
-# Restart the dashboard
+### Step 2: Apply core dashboard patches
+
+This plugin needs small patches to the Hermes dashboard frontend for proper flex layout. Patches live in `patches/` and are applied automatically:
+
+```bash
+cd ~/.hermes/plugins/webui
+./scripts/apply-core-patches.sh
+```
+
+**What the patches do:**
+- Add flex context to plugin routes so the chat fills the viewport
+- Add "Resume in Web Chat" button to the Sessions page
+- Fix inline code background flashing on text selection
+
+**After each `hermes upgrade`:**
+Run the same script — patches are idempotent (already-applied patches are skipped).
+
+### Step 3: Restart Hermes dashboard
+
+```bash
+pkill -f "hermes dashboard"
 hermes dashboard
 ```
 
-### Step 3: Look for the "Web Chat" tab in the sidebar
-
-No build step. No npm install. The plugin ships as a pre-bundled IIFE.
+The "Web Chat" tab will appear in the dashboard sidebar.
 
 ---
 
-## 🔗 Required Patches
+## 📝 Patch-Based Workflow (Why Not a Fork?)
 
-This plugin requires a **one-line change to the Hermes dashboard core** (`App.tsx`). Plugin routes need `display: flex` to support viewport-filling layouts. Without this fix, the chat area collapses to zero height.
+Previously we maintained a forked `hermes-agent` repo with a `feature/webui-chat` branch. This broke every upgrade because `hermes upgrade` resets to `origin/main`, orphaning the branch commits.
 
-**Upstream PR:** [NousResearch/hermes-agent#15819](https://github.com/NousResearch/hermes-agent/pull/15819) — `fix(dashboard): plugin routes get proper flex context for full-height layouts`
+The new patch-based workflow keeps **all plugin-related changes in the plugin repo** — where they belong. The patches are:
+- Version-controlled in `patches/`
+- Applied cleanly with `git apply`
+- Idempotent (safe to run multiple times)
+- Easy to update when upstream changes break them
 
-**Our fork with the fix (until PR merges):**
-- **Repo:** https://github.com/e-shizz/hermes-agent
-- **Branch:** [`feature/webui-chat`](https://github.com/e-shizz/hermes-agent/tree/feature/webui-chat)
-- **Commit:** [`eec701ff`](https://github.com/e-shizz/hermes-agent/commit/eec701ff)
-
-**What changed:**
-- `web/src/App.tsx`: Plugin routes (any route with key prefix `plugin:` or `override:`) now get `min-h-0 flex flex-1 flex-col` container treatment
-- This is the same flex treatment already given to `/chat` and `/docs` routes — extended to plugins
-- No other dashboard behavior changes; built-in pages use explicit heights so adding flex is harmless
+See [CORE_PATCHES.md](CORE_PATCHES.md) for technical details.
 
 ---
 
-## 🔧 Firefox Sidebar Integration (Bonus)
+## 🖼️ Architecture
 
-This plugin can be wired into [Firefox's sidebar API](https://docs.openwebui.com/tutorials/integrations/dev-tools/firefox-sidebar) so the chat UI lives as a persistent panel alongside your browsing session — no tab switching, no context loss.
+```
+┌────────────────────────────────────────────────────────┐
+│  Hermes Dashboard (React)                                  │
+│  ┌───────────────────────────────────────────────┐    │
+│  │  App.tsx — route container (flex context)           │    │
+│  │  ┌───────────────────────────────────────┐  │    │
+│  │  │  Plugin Route: /webui                             │  │    │
+│  │  │  ┌──────────────────────────┐  │  │    │
+│  │  │  │  WebUI Plugin (this repo)                  │  │  │    │
+│  │  │  │  │ SessionSidebar │ ChatWindow │          │  │  │    │
+│  │  │  │  └──────────────────────────┘  │  │    │
+│  │  │  └──────────────────────────────────────┘  │    │
+│  │  └───────────────────────────────────────────────┘    │
+│  └────────────────────────────────────────────────────────┘
+│                                                             │
+│  Backend: Hermes Agent JSON-RPC / SSE / gateway           │
+└────────────────────────────────────────────────────────┘
+```
 
-Because the frontend is a standard web app using `fetch()` and `EventSource`, the same chat UI works both:
-- **Inside the Hermes dashboard** (current — mounted as a plugin tab)
-- **Inside Firefox sidebar** (future — load the plugin route in Firefox's sidebar panel for always-available chat while browsing)
-
-The architecture is intentionally portable: swap the base URL and the same bundle runs anywhere.
-
----
-
-## 🎨 Built With
-
-- Hermes Plugin SDK (`window.__HERMES_PLUGIN_SDK__`) — React, hooks, UI components, API client
-- Vanilla SSE (`EventSource`) — no WebSocket complexity
-- `AIAgent.run_conversation()` from Hermes core — same agent power as the TUI
-- FastAPI router — mounted at `/api/plugins/webui/`
-
----
-
-## 📝 Technical Notes
-
-**Endpoints exposed by the plugin backend:**
-
-| Endpoint | Purpose |
-|----------|---------|
-| `POST /api/plugins/webui/chat` | SSE streaming chat |
-| `GET /api/plugins/webui/models` | Live model discovery |
-| `POST /api/plugins/webui/tts` | Generate TTS audio |
-| `GET /api/plugins/webui/audio?path=...` | Serve TTS audio files |
-
-**Frontend bundle:** `dashboard/dist/index.js` (~25KB IIFE)  
-**Backend:** `dashboard/plugin_api.py` (~250 lines)  
-**Manifest:** `dashboard/manifest.json`
+The plugin registers as a dashboard page via Hermes' plugin manifest system (`plugin.yaml`). The core patches (in `patches/`) only touch the dashboard shell — the chat UI itself is 100% self-contained in this repo.
 
 ---
 
-## 💡 Acknowledgements
+## 📜 License
 
-Built with [Hermes Agent](https://github.com/NousResearch/hermes-agent) by Nous Research. Thanks to the Hermes team for the plugin SDK and dashboard extensibility architecture.
+MIT
