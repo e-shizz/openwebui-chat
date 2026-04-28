@@ -333,7 +333,19 @@ async def chat_endpoint(request: Request):
     request_id = body.get("request_id") or ("req_" + str(uuid.uuid4())[:8])
 
     if not message:
-        return {"error": "Message is required"}
+        from fastapi.responses import JSONResponse
+        return JSONResponse(
+            status_code=400,
+            content={"error": "Message is required"}
+        )
+
+    # Sanity cap: 100k chars is ~25k tokens, more than most context windows
+    if len(message) > 100_000:
+        from fastapi.responses import JSONResponse
+        return JSONResponse(
+            status_code=413,
+            content={"error": f"Message too long ({len(message):,} characters). Max: 100,000."}
+        )
 
     config = _load_agent_config()
     # Allow frontend to override the model per-request
@@ -470,11 +482,16 @@ async def chat_endpoint(request: Request):
     asyncio.create_task(asyncio.to_thread(run_chat))
 
     async def sse_generator():
-        while True:
-            msg = await queue.get()
-            yield f"data: {json.dumps(msg)}\n\n"
-            if msg.get("type") in ("done", "error"):
-                break
+        try:
+            while True:
+                msg = await asyncio.wait_for(queue.get(), timeout=300)
+                yield f"data: {json.dumps(msg)}\n\n"
+                if msg.get("type") in ("done", "error"):
+                    break
+        except asyncio.TimeoutError:
+            yield f"data: {json.dumps({'type': 'error', 'message': 'Request timed out after 5 minutes.'})}\n\n"
+        except Exception as e:
+            yield f"data: {json.dumps({'type': 'error', 'message': f'Stream error: {str(e)}'})}\n\n"
 
     return StreamingResponse(
         sse_generator(),

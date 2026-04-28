@@ -1375,6 +1375,7 @@ function WebUIChat() {
             <textarea
               ref={inputRef}
               value={inputValue}
+              maxLength={32768}
               onChange={(e) => { setInputValue(e.target.value); e.target.style.height = "auto"; e.target.style.height = Math.min(e.target.scrollHeight, 200) + "px"; }}
               onKeyDown={handleKeyDown}
               placeholder={isLoading ? "Hermes is thinking..." : "Message Hermes..."}
@@ -1392,6 +1393,11 @@ function WebUIChat() {
               )}
             </Button>
           </div>
+          {inputValue.length > 0 && (
+            <div className={cn("text-[10px] text-right mt-0.5", inputValue.length > 24000 ? "text-amber-400" : "text-muted-foreground")}>
+              {inputValue.length.toLocaleString()} / 32,768
+            </div>
+          )}
           {messageQueue.length > 0 && (
             <div className="text-[10px] text-muted-foreground text-center mt-1">
               {messageQueue.length} message{messageQueue.length > 1 ? "s" : ""} queued
