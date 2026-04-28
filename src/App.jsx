@@ -694,7 +694,9 @@ function WebUIChat() {
   useEffect(() => {
     if (!activeSessionId) { setMessages([]); return; }
     setError(null);
-    api.getSessionMessages(activeSessionId)
+    // Use plugin endpoint that walks compression chains (include_ancestors)
+    fetch(`/api/plugins/webui/session-messages/${encodeURIComponent(activeSessionId)}`)
+      .then((r) => r.json())
       .then((data) => {
         const allMsgs = data.messages || [];
         const displayMsgs = [];

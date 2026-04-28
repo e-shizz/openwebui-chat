@@ -230,6 +230,30 @@ async def models_endpoint():
     }
 
 
+@router.get("/session-messages/{session_id}")
+async def session_messages_endpoint(session_id: str):
+    """Load all messages for a session, walking compression chains.
+
+    Unlike the core /api/sessions/:id/messages endpoint, this walks
+    ancestor sessions (compression chains) so that compressed conversations
+    still show their full history in the WebUI.
+
+    Returns: {"session_id": "...", "resolved_id": "...", "messages": [...]}
+    """
+    from hermes_state import SessionDB
+    db = SessionDB()
+    try:
+        resolved = db.resolve_resume_session_id(session_id) or session_id
+        messages = db.get_messages_as_conversation(resolved, include_ancestors=True)
+        return {
+            "session_id": session_id,
+            "resolved_id": resolved,
+            "messages": messages,
+        }
+    finally:
+        db.close()
+
+
 @router.post("/command")
 async def command_endpoint(request: Request):
     """Execute a slash command from the WebUI.
@@ -364,7 +388,9 @@ async def chat_endpoint(request: Request):
     if session_id:
         resolved_session_id = db.resolve_resume_session_id(session_id) or session_id
         if resolved_session_id:
-            conversation_history = db.get_messages_as_conversation(resolved_session_id)
+            conversation_history = db.get_messages_as_conversation(
+                resolved_session_id, include_ancestors=True
+            )
             # Strip session_meta entries (synthetic role used by some gateways)
             if conversation_history:
                 conversation_history = [
