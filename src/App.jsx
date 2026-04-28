@@ -1293,6 +1293,26 @@ function WebUIChat() {
           </div>
         )}
 
+        {/* YOLO toggle — top-right, muted until hovered */}
+        <div className="absolute top-2 right-2 z-10 opacity-30 hover:opacity-100 transition-opacity duration-200">
+          <Button
+            onClick={() => handleSend("/yolo")}
+            size="icon"
+            variant="ghost"
+            className={cn(
+              "h-7 w-7 backdrop-blur-sm shadow-sm border",
+              yoloEnabled
+                ? "bg-amber-500/20 border-amber-500/40 text-amber-400 hover:bg-amber-500/30 hover:text-amber-300"
+                : "bg-background/40 border-border/20 text-muted-foreground hover:bg-background/80 hover:text-foreground"
+            )}
+            title={yoloEnabled ? "YOLO mode ON — click to disable" : "YOLO mode OFF — click to enable"}
+          >
+            <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round">
+              <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" />
+            </svg>
+          </Button>
+        </div>
+
         {/* Content area */}
         {!hasContent ? (
           <div className="flex-1 flex flex-col items-center justify-center px-4 overflow-y-auto">
